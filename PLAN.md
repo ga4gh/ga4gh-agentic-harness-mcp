@@ -1,10 +1,10 @@
-# ga4gh-mcp-service — PLAN
+# GA4GH Agentic Harness MCP — PLAN
 
 A universal **MCP server for GA4GH services**. v1 capability: list & access services in the
 [GA4GH Implementation Registry](https://implementation-registry.ga4gh.org/), built to tolerate the
 real-world variance in liveness, spec compliance, and version across registered implementations.
 
-- **Repo:** `mfiume/ga4gh-mcp-service`
+- **Repo:** `mfiume/ga4gh-agentic-harness-mcp`
 - **Stack:** Python ≥3.10, official MCP Python SDK (`mcp` 1.28.1), `httpx`, `pydantic`.
 - **Transports:** `stdio` (Claude Desktop/Code) and `streamable-http` (Vertex, Bedrock, remote).
 - **Status:** 🟢 shipping — see Progress log at bottom.
@@ -135,7 +135,7 @@ service is isolated. Registry data cached with TTL; per-service probes cached br
       handling proven by tests.
 - [x] Pluggable auth implemented; **public + static-token verified headless**; other flows implemented + documented.
 - [x] Copy-paste client configs for Claude Desktop, Claude Code, Vertex AI, Bedrock (each w/ a verify step).
-- [x] PLAN.md / PROGRESS.md current; code committed + pushed to `mfiume/ga4gh-mcp-service`.
+- [x] PLAN.md current; code committed and pushed to `mfiume/ga4gh-agentic-harness-mcp`.
 
 ---
 
@@ -162,16 +162,9 @@ service is isolated. Registry data cached with TTL; per-service probes cached br
 - **Known gaps / future:** Data Connect / Beacon-query / htsget-ticket / WES-run type-aware tools
   not yet added (generic `call_service_endpoint` covers them today); Docker image unbuilt locally;
   no server-side pagination for very large TRS listings (limit-capped).
-- **2026-07-05 — prior attempt discovered on push.** `mfiume/ga4gh-mcp-service` already had a
-  complete prior v1 on `main` (23 tools; DRS/TRS/**WES**; OAuth device-code + client-creds +
-  Passport pass-through; 46 tests; pushed public). This session was a fresh, independent rebuild
-  (18 tools; DRS/TRS/**TES/Beacon**; 63 tests; dual-transport SDK smoke). **Decision: do NOT
-  overwrite `main`.** Pushed this rebuild to branch **`fable5-rebuild`** so Marc can compare and
-  choose. PR creation is blocked by unrelated histories; compare here:
-  `https://github.com/mfiume/ga4gh-mcp-service/compare/main...fable5-rebuild`.
-  Both runs independently converged on the same reality (~24 live; `type.version` ≠ spec version;
-  Terra/Beacon non-standard). Options for Marc: (a) keep `main`, cherry-pick TES/Beacon + smoke +
-  matrix; (b) replace `main` with this branch; (c) merge best of both.
+- **2026-08-11 — Harness reference implementation selected.** The Agentic Harness MCP binding
+  is now the repository's sole runtime surface and will become the default branch. The former
+  implementation is retained under the `legacy` branch for historical comparison.
 - **2026-07-06 — federation + Data Connect (ga4gh-aws-opendata integration).** Added
   `GA4GH_MCP_EXTRA_REGISTRIES` (comma-separated GA4GH Service Registry `/services` URLs): the client
   fetches + normalizes their service-info entries and merges them into `implementations()`, resilient

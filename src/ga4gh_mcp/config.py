@@ -13,9 +13,6 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Transport = Literal["stdio", "streamable-http"]
-Surface = Literal["legacy", "agentic"]
-
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="GA4GH_MCP_",
@@ -35,7 +32,6 @@ class Settings(BaseSettings):
         return [u.strip() for u in self.extra_registries.split(",") if u.strip()]
 
     # --- Transport ---
-    surface: Surface = "legacy"
     transport: Transport = "stdio"
     host: str = "127.0.0.1"
     port: int = 8000

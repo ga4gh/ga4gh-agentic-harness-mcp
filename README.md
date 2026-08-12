@@ -1,7 +1,7 @@
 # ga4gh-agentic-harness-mcp
 
-A **universal [MCP](https://modelcontextprotocol.io) server for GA4GH services.** It provides a
-canonical Agentic Harness binding alongside the original registry-oriented tool surface. v1 makes
+A **reference [MCP](https://modelcontextprotocol.io) implementation of the GA4GH Agentic Harness.**
+It makes
 the [GA4GH Implementation Registry](https://implementation-registry.ga4gh.org/) and the services it
 lists usable by any MCP client (Claude Desktop/Code, Vertex AI, Bedrock). It is built to tolerate
 the real world: registered implementations vary widely in **liveness, spec compliance, and version**,
@@ -37,52 +37,33 @@ uvx --from git+https://github.com/mfiume/ga4gh-agentic-harness-mcp ga4gh-mcp --l
 # stdio (default) — for Claude Desktop / Claude Code
 ga4gh-mcp                      # or: python -m ga4gh_mcp
 
-# canonical Agentic Harness tools backed by the local Python SDK
-ga4gh-mcp --surface agentic
+# GA4GH Agentic Harness tools backed by the local Python SDK
+ga4gh-mcp
 
 # local streamable HTTP
-ga4gh-mcp --surface agentic --transport streamable-http \
+ga4gh-mcp --transport streamable-http \
   --host 127.0.0.1 --port 8000 --path /mcp
 ```
 
-All options are also env vars (prefix `GA4GH_MCP_`): `GA4GH_MCP_SURFACE`,
+All options are also env vars (prefix `GA4GH_MCP_`):
 `GA4GH_MCP_TRANSPORT`, `GA4GH_MCP_HOST`,
 `GA4GH_MCP_PORT`, `GA4GH_MCP_HTTP_PATH`, `GA4GH_MCP_REGISTRY_BASE_URL`, timeouts, cache TTLs,
 `GA4GH_MCP_AUTH_CONFIG`, `GA4GH_MCP_BEARER_TOKEN`, `GA4GH_MCP_BEARER_HOSTS`. See `.env.example`.
 
-## Tool surface
+## Harness tools
 
-Use `--surface agentic` for the 13 canonical tools defined by the Agentic Harness
-MCP crosswalk. These tools delegate to the protocol-neutral SDK and return
+The server exposes the 13 canonical tools defined by the Agentic Harness MCP
+crosswalk. These tools delegate to the protocol-neutral SDK and return
 structured Harness envelopes. See [`docs/agentic-harness.md`](docs/agentic-harness.md).
 
-The default `--surface legacy` preserves the existing tools:
-
-| Tool | What it does |
-|---|---|
-| `list_services` | List registry services with filters (product, org, version, environment, type, free-text). |
-| `get_service` | Full registry entry by UUID or implementationId. |
-| `search_services` | Free-text search across services + deployments. |
-| `list_service_types` | Type counts + GA4GH standards catalog + which types have type-aware helpers. |
-| `list_standards` | GA4GH standards + versions. |
-| `list_organisations` | Registered organisations. |
-| `check_service_health` | Structured liveness + compliance/version report for a service. |
-| `get_service_info` | Fetch + normalize a `/service-info` (by id or raw url); tolerant of 5 shapes. |
-| `call_service_endpoint` | Generic authenticated call to any registered service via its base URL. |
-| `drs_get_object`, `drs_get_access_url` | DRS object metadata + access-URL resolution. |
-| `trs_list_tools`, `trs_get_tool` | TRS workflow/tool listing + detail. |
-| `tes_list_tasks`, `tes_get_task` | TES task listing + detail. |
-| `beacon_info` | Beacon v2 framework info document. |
-| `auth_status`, `auth_device_login` | Inspect auth config; start OAuth2 device-code flow. |
-
-Every tool returns `{"ok": bool, "data"|"error": ..., "warnings": [...]}`.
+Every tool returns the Harness result envelope.
 
 ## Verify from the CLI (no UI needed)
 
 ```bash
 . .venv/bin/activate
 
-# 1) Tools register + schemas load (uses the MCP SDK's own client in-process)
+# 1) Tools register + schemas load and transport round trips
 python scripts/smoke.py                    # exercises registry tools end-to-end; prints PASS/FAIL
 
 # 2) Unit tests (fully mocked; no network)

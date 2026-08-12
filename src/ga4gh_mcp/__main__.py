@@ -8,7 +8,6 @@ import sys
 
 from .agentic_server import AGENTIC_TOOL_NAMES, build_agentic_server
 from .config import load_settings
-from .server import TOOL_NAMES, build_server
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -21,16 +20,14 @@ def _parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--transport", choices=["stdio", "streamable-http"], default=None,
                    help="Transport (default: env GA4GH_MCP_TRANSPORT or 'stdio').")
-    p.add_argument("--surface", choices=["legacy", "agentic"], default=None,
-                   help="Tool surface (default: env GA4GH_MCP_SURFACE or 'legacy').")
     p.add_argument("--host", default=None, help="HTTP bind host (streamable-http).")
     p.add_argument("--port", type=int, default=None, help="HTTP bind port (streamable-http).")
     p.add_argument("--path", default=None, help="HTTP path for the MCP endpoint (default /mcp).")
     p.add_argument("--registry-url", default=None, help="Override the registry base URL.")
     p.add_argument("--agentic-allow-http", action="store_true",
-                   help="Allow HTTP upstreams on the agentic surface for local development.")
+                   help="Allow HTTP upstreams for local development.")
     p.add_argument("--agentic-allow-private-hosts", action="store_true",
-                   help="Allow private/loopback upstreams on the agentic surface for local development.")
+                   help="Allow private/loopback upstreams for local development.")
     p.add_argument("--list-tools", action="store_true",
                    help="Print the registered tool names as JSON and exit (no server).")
     return p
@@ -40,8 +37,6 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
 
     overrides = {}
-    if args.surface:
-        overrides["surface"] = args.surface
     if args.transport:
         overrides["transport"] = args.transport
     if args.host:
@@ -58,16 +53,15 @@ def main(argv: list[str] | None = None) -> int:
         overrides["agentic_allow_private_hosts"] = True
 
     settings = load_settings(**overrides)
-    tool_names = AGENTIC_TOOL_NAMES if settings.surface == "agentic" else TOOL_NAMES
     if args.list_tools:
-        print(json.dumps({"surface": settings.surface, "tools": tool_names,
-                          "count": len(tool_names)}, indent=2))
+        print(json.dumps({"profile": "ga4gh-agentic-harness",
+                          "tools": AGENTIC_TOOL_NAMES,
+                          "count": len(AGENTIC_TOOL_NAMES)}, indent=2))
         return 0
 
-    server = (build_agentic_server(settings) if settings.surface == "agentic"
-              else build_server(settings))
+    server = build_agentic_server(settings)
     # stderr is safe to log to under stdio (stdout is the JSON-RPC channel).
-    print(f"[ga4gh-mcp] starting surface={settings.surface} transport={settings.transport} "
+    print(f"[ga4gh-mcp] starting profile=ga4gh-agentic-harness transport={settings.transport} "
           f"registry={settings.registry_base_url}", file=sys.stderr)
     if settings.transport == "streamable-http":
         print(f"[ga4gh-mcp] listening on http://{settings.host}:{settings.port}"

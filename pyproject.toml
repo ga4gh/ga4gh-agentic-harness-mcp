@@ -1,7 +1,7 @@
 [project]
-name = "ga4gh-mcp-service"
+name = "ga4gh-agentic-harness-mcp"
 version = "0.1.0"
-description = "Universal MCP server for GA4GH services, starting with the GA4GH Implementation Registry."
+description = "Reference MCP implementation of the GA4GH Agentic Harness."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }

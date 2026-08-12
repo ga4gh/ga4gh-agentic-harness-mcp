@@ -1,6 +1,6 @@
 # Agentic Harness MCP binding
 
-The agentic surface is a thin MCP projection over the local
+This server is a thin MCP projection over the local
 `ga4gh-agentic-harness-python` SDK. It exposes the 13 canonical tool names in the
 Agentic Harness MCP crosswalk and returns the SDK's Harness result envelope as
 MCP structured content.
@@ -13,18 +13,18 @@ The uv source in `pyproject.toml` points to the sibling SDK checkout:
 ../ga4gh-agentic-harness-python
 ```
 
-Install and inspect the agentic surface locally:
+Install and inspect the Harness implementation locally:
 
 ```bash
 uv sync --extra dev
-uv run ga4gh-mcp --surface agentic --list-tools
-uv run ga4gh-mcp --surface agentic
+uv run ga4gh-mcp --list-tools
+uv run ga4gh-mcp
 ```
 
 The default transport is stdio. For a local HTTP client, bind only to loopback:
 
 ```bash
-uv run ga4gh-mcp --surface agentic --transport streamable-http \
+uv run ga4gh-mcp --transport streamable-http \
   --host 127.0.0.1 --port 8000 --path /mcp
 ```
 
@@ -34,7 +34,7 @@ from the Implementation Registry while the MCP process remains local.
 To use a GA4GH Service Registry on localhost, opt in explicitly:
 
 ```bash
-uv run ga4gh-mcp --surface agentic --transport streamable-http \
+uv run ga4gh-mcp --transport streamable-http \
   --host 127.0.0.1 --port 8765 --path /mcp \
   --registry-url http://127.0.0.1:18080/ga4gh/registry \
   --agentic-allow-http --agentic-allow-private-hosts
@@ -65,12 +65,6 @@ WES submission and cancellation are denied by default. For a trusted local clien
 `GA4GH_MCP_AGENTIC_WRITE_SCOPES` may explicitly list `ga4gh:workflow:submit` and/or
 `ga4gh:workflow:cancel`. On the unauthenticated loopback HTTP transport those scopes apply to
 every connected local client, so do not enable them on a shared machine or network interface.
-
-## Surfaces
-
-`--surface agentic` selects canonical Agentic Harness tools. `--surface legacy`
-retains the existing registry-oriented tools and remains the default during the
-transition. The same selection is available through `GA4GH_MCP_SURFACE`.
 
 The profile schemas and SDK inputs are not yet identical: profile operations
 use complete service references, while SDK v0.1 currently selects registered

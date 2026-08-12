@@ -41,7 +41,7 @@ def build_server(settings: Settings | None = None,
             await context.aclose()
 
     mcp = FastMCP(
-        name="ga4gh-mcp-service",
+        name="ga4gh-agentic-harness-mcp",
         instructions=INSTRUCTIONS,
         host=settings.host,
         port=settings.port,

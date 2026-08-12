@@ -206,7 +206,7 @@ async def test_end_to_end_mcp_invocation_uses_real_sdk_harness():
 
 
 def test_agentic_runtime_defaults_are_local_and_safe():
-    settings = load_settings(surface="agentic")
+    settings = load_settings()
     mcp = build_agentic_server(settings)
     harness = mcp._ga4gh_harness  # type: ignore[attr-defined]
 
@@ -219,7 +219,6 @@ def test_agentic_runtime_defaults_are_local_and_safe():
 
 def test_agentic_local_exceptions_and_write_scopes_are_explicit():
     settings = load_settings(
-        surface="agentic",
         agentic_allow_http=True,
         agentic_allow_private_hosts=True,
         agentic_allowed_hosts="127.0.0.1",
@@ -233,9 +232,9 @@ def test_agentic_local_exceptions_and_write_scopes_are_explicit():
     assert harness.settings.allowed_hosts == ["127.0.0.1"]
 
 
-def test_cli_lists_selected_agentic_surface(capsys):
-    assert main(["--surface", "agentic", "--list-tools"]) == 0
+def test_cli_lists_harness_tools(capsys):
+    assert main(["--list-tools"]) == 0
     output = capsys.readouterr().out
-    assert '"surface": "agentic"' in output
+    assert '"profile": "ga4gh-agentic-harness"' in output
     assert '"ga4gh_harness_describe"' in output
     assert '"count": 13' in output
