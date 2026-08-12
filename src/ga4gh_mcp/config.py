@@ -13,6 +13,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Transport = Literal["stdio", "streamable-http"]
+Surface = Literal["legacy", "agentic"]
 
 
 class Settings(BaseSettings):
@@ -34,6 +35,7 @@ class Settings(BaseSettings):
         return [u.strip() for u in self.extra_registries.split(",") if u.strip()]
 
     # --- Transport ---
+    surface: Surface = "legacy"
     transport: Transport = "stdio"
     host: str = "127.0.0.1"
     port: int = 8000
@@ -48,6 +50,17 @@ class Settings(BaseSettings):
     verify_tls: bool = True
     user_agent: str = "ga4gh-mcp-service/0.1 (+https://github.com/mfiume/ga4gh-mcp-service)"
     max_response_bytes: int = 2_000_000  # cap on any single upstream body we buffer
+    # Agentic SDK exceptions for explicit local development. Disabled by default.
+    agentic_allow_http: bool = False
+    agentic_allow_private_hosts: bool = False
+    agentic_allowed_hosts: str = ""
+    agentic_write_scopes: str = ""
+
+    def agentic_allowed_host_list(self) -> list[str]:
+        return [h.strip().lower() for h in self.agentic_allowed_hosts.split(",") if h.strip()]
+
+    def agentic_write_scope_list(self) -> list[str]:
+        return [s.strip() for s in self.agentic_write_scopes.split(",") if s.strip()]
 
     # --- Caching ---
     registry_cache_ttl: float = 300.0  # seconds; registry lists change slowly

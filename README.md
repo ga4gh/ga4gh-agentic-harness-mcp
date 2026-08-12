@@ -1,7 +1,8 @@
 # ga4gh-mcp-service
 
-A **universal [MCP](https://modelcontextprotocol.io) server for GA4GH services.** v1 makes the
-[GA4GH Implementation Registry](https://implementation-registry.ga4gh.org/) and the services it
+A **universal [MCP](https://modelcontextprotocol.io) server for GA4GH services.** It provides a
+canonical Agentic Harness binding alongside the original registry-oriented tool surface. v1 makes
+the [GA4GH Implementation Registry](https://implementation-registry.ga4gh.org/) and the services it
 lists usable by any MCP client (Claude Desktop/Code, Vertex AI, Bedrock). It is built to tolerate
 the real world: registered implementations vary widely in **liveness, spec compliance, and version**,
 and the server degrades gracefully instead of failing.
@@ -20,6 +21,10 @@ uv venv && . .venv/bin/activate      # or: python -m venv .venv && . .venv/bin/a
 uv pip install -e ".[dev]"           # or: pip install -e ".[dev]"
 ```
 
+For local Agentic Harness development, keep
+`ga4gh-agentic-harness-python` beside this checkout and use `uv sync --extra dev`.
+The editable SDK path is declared in `pyproject.toml`.
+
 Run directly with no clone via uvx:
 
 ```bash
@@ -32,15 +37,26 @@ uvx --from git+https://github.com/mfiume/ga4gh-mcp-service ga4gh-mcp --list-tool
 # stdio (default) — for Claude Desktop / Claude Code
 ga4gh-mcp                      # or: python -m ga4gh_mcp
 
-# streamable HTTP — for remote clients / Vertex / Bedrock
-ga4gh-mcp --transport streamable-http --host 0.0.0.0 --port 8000 --path /mcp
+# canonical Agentic Harness tools backed by the local Python SDK
+ga4gh-mcp --surface agentic
+
+# local streamable HTTP
+ga4gh-mcp --surface agentic --transport streamable-http \
+  --host 127.0.0.1 --port 8000 --path /mcp
 ```
 
-All options are also env vars (prefix `GA4GH_MCP_`): `GA4GH_MCP_TRANSPORT`, `GA4GH_MCP_HOST`,
+All options are also env vars (prefix `GA4GH_MCP_`): `GA4GH_MCP_SURFACE`,
+`GA4GH_MCP_TRANSPORT`, `GA4GH_MCP_HOST`,
 `GA4GH_MCP_PORT`, `GA4GH_MCP_HTTP_PATH`, `GA4GH_MCP_REGISTRY_BASE_URL`, timeouts, cache TTLs,
 `GA4GH_MCP_AUTH_CONFIG`, `GA4GH_MCP_BEARER_TOKEN`, `GA4GH_MCP_BEARER_HOSTS`. See `.env.example`.
 
 ## Tool surface
+
+Use `--surface agentic` for the 13 canonical tools defined by the Agentic Harness
+MCP crosswalk. These tools delegate to the protocol-neutral SDK and return
+structured Harness envelopes. See [`docs/agentic-harness.md`](docs/agentic-harness.md).
+
+The default `--surface legacy` preserves the existing tools:
 
 | Tool | What it does |
 |---|---|
