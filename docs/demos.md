@@ -201,6 +201,6 @@ pretended a broken service was fine.
 ## Reproduce the numbers
 
 ```bash
-cd ~/Development/ga4gh-mcp-service && . .venv/bin/activate
+cd ~/Development/ga4gh-agentic-harness-mcp && . .venv/bin/activate
 python scripts/probe_registry.py          # regenerates the live liveness/compliance snapshot
 ```

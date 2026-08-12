@@ -1,4 +1,4 @@
-# ga4gh-mcp-service
+# ga4gh-agentic-harness-mcp
 
 A **universal [MCP](https://modelcontextprotocol.io) server for GA4GH services.** It provides a
 canonical Agentic Harness binding alongside the original registry-oriented tool surface. v1 makes
@@ -16,7 +16,7 @@ and the server degrades gracefully instead of failing.
 ## Install
 
 ```bash
-git clone https://github.com/mfiume/ga4gh-mcp-service && cd ga4gh-mcp-service
+git clone https://github.com/mfiume/ga4gh-agentic-harness-mcp && cd ga4gh-agentic-harness-mcp
 uv venv && . .venv/bin/activate      # or: python -m venv .venv && . .venv/bin/activate
 uv pip install -e ".[dev]"           # or: pip install -e ".[dev]"
 ```
@@ -28,7 +28,7 @@ The editable SDK path is declared in `pyproject.toml`.
 Run directly with no clone via uvx:
 
 ```bash
-uvx --from git+https://github.com/mfiume/ga4gh-mcp-service ga4gh-mcp --list-tools
+uvx --from git+https://github.com/mfiume/ga4gh-agentic-harness-mcp ga4gh-mcp --list-tools
 ```
 
 ## Run

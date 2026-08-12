@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     max_retries: int = 2  # retries on transient failures (429/5xx/connect)
     retry_backoff: float = 0.5  # base seconds; exponential
     verify_tls: bool = True
-    user_agent: str = "ga4gh-mcp-service/0.1 (+https://github.com/mfiume/ga4gh-mcp-service)"
+    user_agent: str = "ga4gh-agentic-harness-mcp/0.1 (+https://github.com/mfiume/ga4gh-agentic-harness-mcp)"
     max_response_bytes: int = 2_000_000  # cap on any single upstream body we buffer
     # Agentic SDK exceptions for explicit local development. Disabled by default.
     agentic_allow_http: bool = False

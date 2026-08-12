@@ -13,7 +13,7 @@ Claude Desktop speaks MCP over **stdio**. Add this server to
   "mcpServers": {
     "ga4gh": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/mfiume/ga4gh-mcp-service", "ga4gh-mcp"]
+      "args": ["--from", "git+https://github.com/mfiume/ga4gh-agentic-harness-mcp", "ga4gh-mcp"]
     }
   }
 }
@@ -25,7 +25,7 @@ Claude Desktop speaks MCP over **stdio**. Add this server to
 {
   "mcpServers": {
     "ga4gh": {
-      "command": "/absolute/path/to/ga4gh-mcp-service/.venv/bin/ga4gh-mcp",
+      "command": "/absolute/path/to/ga4gh-agentic-harness-mcp/.venv/bin/ga4gh-mcp",
       "args": [],
       "env": {
         "GA4GH_MCP_AUTH_CONFIG": "/absolute/path/to/auth.json"
@@ -42,7 +42,7 @@ protected services.
 
 1. Confirm the command works before wiring it in:
    ```bash
-   uvx --from git+https://github.com/mfiume/ga4gh-mcp-service ga4gh-mcp --list-tools
+   uvx --from git+https://github.com/mfiume/ga4gh-agentic-harness-mcp ga4gh-mcp --list-tools
    # -> prints 18 tools as JSON
    ```
 2. Fully restart Claude Desktop (quit, not just close the window).

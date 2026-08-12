@@ -6,17 +6,17 @@ Claude Code connects over **stdio** (local) or **streamable-http** (remote).
 
 ```bash
 # no install, via uvx
-claude mcp add ga4gh -- uvx --from git+https://github.com/mfiume/ga4gh-mcp-service ga4gh-mcp
+claude mcp add ga4gh -- uvx --from git+https://github.com/mfiume/ga4gh-agentic-harness-mcp ga4gh-mcp
 
 # or from a local checkout
-claude mcp add ga4gh -- /abs/path/ga4gh-mcp-service/.venv/bin/ga4gh-mcp
+claude mcp add ga4gh -- /abs/path/ga4gh-agentic-harness-mcp/.venv/bin/ga4gh-mcp
 ```
 
 Pass auth env vars with `-e` if needed:
 
 ```bash
 claude mcp add ga4gh -e GA4GH_MCP_AUTH_CONFIG=/abs/path/auth.json -- \
-  uvx --from git+https://github.com/mfiume/ga4gh-mcp-service ga4gh-mcp
+  uvx --from git+https://github.com/mfiume/ga4gh-agentic-harness-mcp ga4gh-mcp
 ```
 
 ## Add a remote (streamable-http) server
@@ -40,7 +40,7 @@ claude mcp add --transport http ga4gh https://your-host:8000/mcp
   "mcpServers": {
     "ga4gh": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/mfiume/ga4gh-mcp-service", "ga4gh-mcp"]
+      "args": ["--from", "git+https://github.com/mfiume/ga4gh-agentic-harness-mcp", "ga4gh-mcp"]
     }
   }
 }

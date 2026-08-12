@@ -28,7 +28,7 @@ dev = [
 ga4gh-mcp = "ga4gh_mcp.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/mfiume/ga4gh-mcp-service"
+Homepage = "https://github.com/mfiume/ga4gh-agentic-harness-mcp"
 Registry = "https://implementation-registry.ga4gh.org/"
 
 [build-system]
