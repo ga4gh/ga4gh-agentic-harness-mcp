@@ -163,8 +163,7 @@ service is isolated. Registry data cached with TTL; per-service probes cached br
   not yet added (generic `call_service_endpoint` covers them today); Docker image unbuilt locally;
   no server-side pagination for very large TRS listings (limit-capped).
 - **2026-08-11 — Harness reference implementation selected.** The Agentic Harness MCP binding
-  is now the repository's sole runtime surface and will become the default branch. The former
-  implementation is retained under the `legacy` branch for historical comparison.
+  is now the repository's sole runtime surface and the repository default branch.
 - **2026-07-06 — federation + Data Connect (ga4gh-aws-opendata integration).** Added
   `GA4GH_MCP_EXTRA_REGISTRIES` (comma-separated GA4GH Service Registry `/services` URLs): the client
   fetches + normalizes their service-info entries and merges them into `implementations()`, resilient
