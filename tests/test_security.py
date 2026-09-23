@@ -9,6 +9,9 @@ different origin, and must not reach loopback, private, or cloud-metadata addres
 from __future__ import annotations
 
 import json
+import os
+import stat
+from pathlib import Path
 
 import httpx
 import pytest
@@ -16,6 +19,8 @@ import respx
 
 from ga4gh_mcp import http_client as http_mod
 from ga4gh_mcp import tools
+from ga4gh_mcp.auth.base import AuthSpec
+from ga4gh_mcp.auth.providers import OAuth2DeviceCodeAuth, build_provider
 from ga4gh_mcp.auth.resolver import AuthResolver
 from ga4gh_mcp.config import load_settings
 from ga4gh_mcp.context import ServerContext
@@ -315,3 +320,40 @@ async def test_call_service_endpoint_path_cannot_leave_api_base(ctx, path):
     out = await tools.call_service_endpoint(_drs_ctx(ctx), service_id="drs-sec", path=path)
     assert out["ok"] is False
     assert not route.called
+
+
+# ------------------------------------------------------------------ token cache on disk
+
+
+def _device(store: Path) -> OAuth2DeviceCodeAuth:
+    return OAuth2DeviceCodeAuth(Ga4ghHttpClient(load_settings()), device_authorization_url="",
+                                token_url="", client_id="c", token_store=str(store))
+
+
+def test_token_cache_directory_is_private(tmp_path):
+    store = tmp_path / "tokens" / "svc.json"
+    _device(store)._store_tokens({"access_token": "t", "refresh_token": "r"})
+    assert stat.S_IMODE(store.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(store.stat().st_mode) == 0o600
+
+
+def test_token_cache_file_is_created_private(tmp_path, monkeypatch):
+    # The file must be 0600 from creation, not chmod'ed after the refresh token is written.
+    monkeypatch.setattr(Path, "chmod", lambda self, mode: None)
+    old = os.umask(0o022)
+    try:
+        store = tmp_path / "svc.json"
+        _device(store)._store_tokens({"access_token": "t", "refresh_token": "r"})
+    finally:
+        os.umask(old)
+    assert stat.S_IMODE(store.stat().st_mode) == 0o600
+
+
+def test_token_cache_paths_do_not_collide(tmp_path):
+    http = Ga4ghHttpClient(load_settings())
+    paths = set()
+    for match in ("org.a.drs", "org_a_drs", "org-a-drs"):
+        p = build_provider(AuthSpec(kind="oauth2_device_code", match=match, client_id="c"),
+                           http, token_store_dir=str(tmp_path))
+        paths.add(p.describe()["token_store"])
+    assert len(paths) == 3

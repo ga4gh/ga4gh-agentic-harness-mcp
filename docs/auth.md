@@ -121,7 +121,7 @@ Configure an `oauth2_device_code` spec for the service, then:
 ```
 
 Open the `verification_uri` in any browser once, enter the `user_code`, and authorize. The token is
-cached to `~/.ga4gh-mcp/tokens/<match>.json` (mode 0600) and refreshed automatically thereafter.
+cached to `~/.ga4gh-mcp/tokens/<match>-<digest>.json` (file 0600, directory 0700) and refreshed automatically thereafter.
 The device flow's start + poll + refresh logic is unit-tested in
 `tests/test_auth.py::test_device_code_flow_start_and_poll`.
 

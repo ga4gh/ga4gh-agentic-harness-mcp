@@ -10,6 +10,7 @@ Secrets come only from environment variables. Tokens are never logged or returne
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
@@ -164,12 +165,20 @@ class OAuth2DeviceCodeAuth:
     def _save(self) -> None:
         if not self._store:
             return
-        self._store.parent.mkdir(parents=True, exist_ok=True)
-        self._store.write_text(json.dumps(
-            {"access_token": self._token, "refresh_token": self._refresh,
-             "expires_at": self._expires_at}))
+        # Owner-only from creation: the file holds a refresh token, so it must never exist with
+        # umask-default permissions, even briefly.
+        self._store.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         try:
-            self._store.chmod(0o600)
+            self._store.parent.chmod(0o700)
+        except OSError:
+            pass
+        payload = json.dumps({"access_token": self._token, "refresh_token": self._refresh,
+                              "expires_at": self._expires_at})
+        fd = os.open(self._store, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            fh.write(payload)
+        try:
+            self._store.chmod(0o600)  # tighten a file created by an older version
         except OSError:
             pass
 
@@ -314,8 +323,11 @@ def build_provider(spec: AuthSpec, http: Ga4ghHttpClient, *, token_store_dir: st
     if kind == "oauth2_device_code":
         store = None
         if token_store_dir and spec.match:
+            # Readable prefix plus a digest of the exact match, so "org.a" and "org_a" never
+            # share (and load each other's) cached tokens.
             safe = "".join(c if c.isalnum() else "_" for c in spec.match)
-            store = str(Path(token_store_dir) / f"{safe}.json")
+            digest = hashlib.sha256(spec.match.encode()).hexdigest()[:12]
+            store = str(Path(token_store_dir) / f"{safe}-{digest}.json")
         return OAuth2DeviceCodeAuth(
             http,
             device_authorization_url=spec.device_authorization_url or "",
