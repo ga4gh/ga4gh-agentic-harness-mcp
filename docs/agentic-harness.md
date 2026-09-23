@@ -7,11 +7,10 @@ MCP structured content.
 
 ## Local development
 
-The uv source in `pyproject.toml` points to the sibling SDK checkout:
-
-```text
-../ga4gh-agentic-harness-python
-```
+The uv source in `pyproject.toml` installs the SDK from
+`https://github.com/ga4gh/ga4gh-agentic-harness-python` (branch `main`, pinned in `uv.lock`).
+To work against a local SDK checkout instead, run `uv pip install -e
+../ga4gh-agentic-harness-python` after `uv sync`.
 
 Install and inspect the Harness implementation locally:
 

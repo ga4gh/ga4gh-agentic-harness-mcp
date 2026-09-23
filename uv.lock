@@ -263,25 +263,12 @@ wheels = [
 [[package]]
 name = "ga4gh-agentic-harness"
 version = "0.1.0.dev0"
-source = { editable = "../ga4gh-agentic-harness-python" }
+source = { git = "https://github.com/ga4gh/ga4gh-agentic-harness-python?branch=main#bd2f30d1037dd29761aa6eff202e643d758f8097" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "httpx", specifier = ">=0.27,<1" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.14,<2" },
-    { name = "pydantic", specifier = ">=2.10,<3" },
-    { name = "pydantic-settings", specifier = ">=2.7,<3" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3,<10" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.25,<2" },
-    { name = "respx", marker = "extra == 'dev'", specifier = ">=0.22,<1" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9,<1" },
-]
-provides-extras = ["dev"]
 
 [[package]]
 name = "ga4gh-agentic-harness-mcp"
@@ -304,7 +291,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ga4gh-agentic-harness", editable = "../ga4gh-agentic-harness-python" },
+    { name = "ga4gh-agentic-harness", git = "https://github.com/ga4gh/ga4gh-agentic-harness-python?branch=main" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "mcp", specifier = "==1.28.1" },
     { name = "pydantic", specifier = "==2.13.4" },

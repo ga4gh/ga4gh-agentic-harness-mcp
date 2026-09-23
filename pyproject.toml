@@ -28,7 +28,7 @@ dev = [
 ga4gh-mcp = "ga4gh_mcp.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/mfiume/ga4gh-agentic-harness-mcp"
+Homepage = "https://github.com/ga4gh/ga4gh-agentic-harness-mcp"
 Registry = "https://implementation-registry.ga4gh.org/"
 
 [build-system]
@@ -44,4 +44,4 @@ testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.uv.sources]
-ga4gh-agentic-harness = { path = "../ga4gh-agentic-harness-python", editable = true }
+ga4gh-agentic-harness = { git = "https://github.com/ga4gh/ga4gh-agentic-harness-python", branch = "main" }
