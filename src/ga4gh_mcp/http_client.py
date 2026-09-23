@@ -183,8 +183,9 @@ class Ga4ghHttpClient:
             if nxt is None:
                 return resp
             await resp.aclose()
+            body = await nxt.aread()  # a 307/308 carries the original body; 301/302/303 do not
             if origin(nxt.url) != start_origin:
-                if nxt.content:
+                if body:
                     raise RedirectRefused(
                         f"refused {resp.status_code} redirect that would re-send the request "
                         f"body to a different origin ({nxt.url.scheme}://{nxt.url.host})")

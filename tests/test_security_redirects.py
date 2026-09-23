@@ -29,10 +29,10 @@ async def test_cross_origin_redirect_drops_custom_auth_header():
     await c.get_json("https://svc.test/objects/x",
                      headers={"X-API-Key": "k-secret", "Authorization": "Bearer t-secret"})
     await c.aclose()
-    if sink.called:
-        sent = sink.calls[0].request.headers
-        assert "x-api-key" not in sent
-        assert "authorization" not in sent
+    assert sink.called  # public redirects are still followed, just without credentials
+    sent = sink.calls[0].request.headers
+    assert "x-api-key" not in sent
+    assert "authorization" not in sent
 
 
 @respx.mock
@@ -43,8 +43,8 @@ async def test_scheme_downgrade_redirect_drops_custom_auth_header():
     c = _client()
     await c.get_json("https://svc.test/objects/x", headers={"X-API-Key": "k-secret"})
     await c.aclose()
-    if plain.called:
-        assert "x-api-key" not in plain.calls[0].request.headers
+    assert plain.called
+    assert "x-api-key" not in plain.calls[0].request.headers
 
 
 @respx.mock
