@@ -58,7 +58,7 @@ private network; set it to `true` to apply the same rule under stdio.
 | `list_organisations` | Registered organisations. |
 | `check_service_health` | Structured liveness + compliance/version report for a service. |
 | `get_service_info` | Fetch + normalize a `/service-info` (by id or raw url); tolerant of 5 shapes. |
-| `call_service_endpoint` | Generic authenticated call to any registered service via its base URL. |
+| `call_service_endpoint` | Generic authenticated call to any registered service via its base URL. GET/HEAD only unless `GA4GH_MCP_ALLOW_WRITE_METHODS=true`, which also flips its annotations to destructive. |
 | `drs_get_object`, `drs_get_access_url` | DRS object metadata + access-URL resolution. |
 | `trs_list_tools`, `trs_get_tool` | TRS workflow/tool listing + detail. |
 | `tes_list_tasks`, `tes_get_task` | TES task listing + detail. |

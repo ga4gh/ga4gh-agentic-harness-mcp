@@ -58,6 +58,12 @@ class Settings(BaseSettings):
             return self.block_private_addresses
         return self.transport != "stdio"
 
+    # --- Generic endpoint access ---
+    # call_service_endpoint sends GET/HEAD only unless this is true. POST/PUT/PATCH/DELETE can
+    # submit or cancel TES tasks / WES runs with the configured credentials attached, so they
+    # are an operator decision, not something the model can reach by choosing a method.
+    allow_write_methods: bool = False
+
     # --- Caching ---
     registry_cache_ttl: float = 300.0  # seconds; registry lists change slowly
     liveness_cache_ttl: float = 30.0  # seconds; per-service probe results

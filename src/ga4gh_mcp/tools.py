@@ -25,6 +25,9 @@ from .services import tes as tes_mod
 from .services import trs as trs_mod
 
 
+READ_METHODS = {"GET", "HEAD"}
+
+
 def guarded(fn):
     @wraps(fn)
     async def wrapper(*args, **kwargs):
@@ -158,6 +161,13 @@ async def call_service_endpoint(ctx: ServerContext, *, service_id: str, path: st
     method = method.upper()
     if method not in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"}:
         raise ToolError(ErrorType.VALIDATION, f"unsupported method: {method}")
+    if method not in READ_METHODS and not ctx.settings.allow_write_methods:
+        raise ToolError(
+            ErrorType.VALIDATION,
+            f"{method} is disabled: call_service_endpoint is read-only (GET/HEAD) by default",
+            hint="State-changing requests (e.g. TES/WES submit or cancel) must be enabled by "
+                 "the server operator with GA4GH_MCP_ALLOW_WRITE_METHODS=true.",
+        )
     s = await ctx.registry.get_service(service_id)
     product = (s.get("standardVersion") or {}).get("ga4ghProduct")
     plugin = get_plugin(product)
@@ -172,7 +182,7 @@ async def call_service_endpoint(ctx: ServerContext, *, service_id: str, path: st
     res = await ctx.http.request(method, base + path, headers=headers or None,
                                  params=query, json_body=json_body)
     warnings = []
-    if method not in {"GET", "HEAD"}:
+    if method not in READ_METHODS:
         warnings.append(f"executed a {method} request against a live service.")
     return _res_envelope(res, warnings=warnings)
 

@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 
 from . import tools
 from .config import Settings, load_settings
@@ -26,6 +27,16 @@ list_services / search_services to find a service id, then get_service / check_s
 get_service_info, then type-aware tools (drs_*, trs_*, tes_*, beacon_info) or the generic
 call_service_endpoint. Auth is discovered per service; see auth_status.
 """
+
+
+def _annotations(*, read_only: bool, destructive: bool = False, idempotent: bool = True,
+                 open_world: bool = True) -> ToolAnnotations:
+    return ToolAnnotations(readOnlyHint=read_only, destructiveHint=destructive,
+                           idempotentHint=idempotent, openWorldHint=open_world)
+
+
+# Read-only tools that reach the registry or a remote GA4GH service.
+_READ_REMOTE = _annotations(read_only=True)
 
 
 def build_server(settings: Settings | None = None,
@@ -51,7 +62,7 @@ def build_server(settings: Settings | None = None,
     )
 
     # ---------------------------------------------------------------- registry tools
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def list_services(
         product: str | None = None,
         org: str | None = None,
@@ -79,33 +90,33 @@ def build_server(settings: Settings | None = None,
             implementation_type=implementation_type, query=query,
             include_deployments=include_deployments, limit=limit)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def get_service(service_id: str) -> dict[str, Any]:
         """Get the full registry entry for a service by UUID or implementationId."""
         return await tools.get_service(context, service_id=service_id)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def search_services(query: str, limit: int = 25) -> dict[str, Any]:
         """Free-text search across all registered services and deployments."""
         return await tools.search_services(context, query=query, limit=limit)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def list_service_types() -> dict[str, Any]:
         """Summarize service types present (counts) + the GA4GH standards the registry knows +
         which types have type-aware helpers here."""
         return await tools.list_service_types(context)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def list_standards() -> dict[str, Any]:
         """List the GA4GH standards catalog (DRS, WES, TES, TRS, htsget, Beacon, …) with versions."""
         return await tools.list_standards(context)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def list_organisations(query: str | None = None) -> dict[str, Any]:
         """List organisations registered in the registry (optionally filtered by substring)."""
         return await tools.list_organisations(context, query=query)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def check_service_health(service_id: str) -> dict[str, Any]:
         """Probe a registered service and return a structured liveness + compliance report:
         reachability class, HTTP status, latency, service-info version reconciliation, and any
@@ -113,85 +124,88 @@ def build_server(settings: Settings | None = None,
         return await tools.check_service_health(context, service_id=service_id)
 
     # ------------------------------------------------------------- generic access tools
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def get_service_info(service_id: str | None = None,
                                url: str | None = None) -> dict[str, Any]:
         """Fetch and normalize a service's /service-info (by registry service_id, or a raw url).
         Returns a shape-tolerant analysis with version reconciliation and compliance warnings."""
         return await tools.get_service_info(context, service_id=service_id, url=url)
 
-    @mcp.tool()
+    @mcp.tool(annotations=(
+        _annotations(read_only=False, destructive=True, idempotent=False)
+        if settings.allow_write_methods else _READ_REMOTE))
     async def call_service_endpoint(service_id: str, path: str, method: str = "GET",
                                     query: dict[str, Any] | None = None,
                                     json_body: Any = None) -> dict[str, Any]:
         """Generic authenticated call to any registered service (works across all types via the
         service's base URL). `path` is relative to the service API base (e.g. "/objects/{id}").
-        Returns the structured envelope; on 401 it includes an auth hint."""
+        Returns the structured envelope; on 401 it includes an auth hint. GET/HEAD only unless
+        the operator set GA4GH_MCP_ALLOW_WRITE_METHODS=true."""
         return await tools.call_service_endpoint(
             context, service_id=service_id, path=path, method=method,
             query=query, json_body=json_body)
 
     # -------------------------------------------------------------- type-aware helpers
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def drs_get_object(service_id: str, object_id: str) -> dict[str, Any]:
         """DRS: fetch a data object's metadata (bundles, checksums, access methods)."""
         return await tools.drs_get_object(context, service_id=service_id, object_id=object_id)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def drs_get_access_url(service_id: str, object_id: str,
                                  access_id: str | None = None) -> dict[str, Any]:
         """DRS: resolve a concrete access URL for a data object (dereferences access_id if needed)."""
         return await tools.drs_get_access_url(
             context, service_id=service_id, object_id=object_id, access_id=access_id)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def trs_list_tools(service_id: str, limit: int = 20) -> dict[str, Any]:
         """TRS: list registered tools/workflows."""
         return await tools.trs_list_tools(context, service_id=service_id, limit=limit)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def trs_get_tool(service_id: str, tool_id: str) -> dict[str, Any]:
         """TRS: get a single tool/workflow by id."""
         return await tools.trs_get_tool(context, service_id=service_id, tool_id=tool_id)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def tes_list_tasks(service_id: str, limit: int = 20) -> dict[str, Any]:
         """TES: list execution tasks (BASIC view)."""
         return await tools.tes_list_tasks(context, service_id=service_id, limit=limit)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def tes_get_task(service_id: str, task_id: str) -> dict[str, Any]:
         """TES: get a single task (FULL view)."""
         return await tools.tes_get_task(context, service_id=service_id, task_id=task_id)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def beacon_info(service_id: str) -> dict[str, Any]:
         """Beacon: fetch the Beacon v2 framework info document."""
         return await tools.beacon_info(context, service_id=service_id)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def data_connect_list_tables(service_id: str) -> dict[str, Any]:
         """Data Connect: list the tables a service exposes (e.g. AWS Open Data variant tables)."""
         return await tools.data_connect_list_tables(context, service_id=service_id)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def data_connect_table_info(service_id: str, table: str) -> dict[str, Any]:
         """Data Connect: get a table's JSON-Schema data model (columns + types)."""
         return await tools.data_connect_table_info(context, service_id=service_id, table=table)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_READ_REMOTE)
     async def data_connect_search(service_id: str, sql: str) -> dict[str, Any]:
         """Data Connect: run a read-only SQL query against a service's tables and return rows.
         Example: SELECT gene, oe_lof_upper AS loeuf FROM gnomad.gene_constraint WHERE gene='BRCA1'."""
         return await tools.data_connect_search(context, service_id=service_id, sql=sql)
 
     # ------------------------------------------------------------------------ auth tools
-    @mcp.tool()
+    @mcp.tool(annotations=_annotations(read_only=True, open_world=False))
     async def auth_status() -> dict[str, Any]:
         """Report configured auth providers, the global bearer allow-list, and token store path."""
         return await tools.auth_status(context)
 
-    @mcp.tool()
+    @mcp.tool(annotations=_annotations(read_only=False, idempotent=False))
     async def auth_device_login(service_id: str, wait: bool = False) -> dict[str, Any]:
         """Start the OAuth2 device-code flow for a service configured with it. Returns a
         verification URI + user code. Set wait=true to block until authorized (CLI-friendly)."""
