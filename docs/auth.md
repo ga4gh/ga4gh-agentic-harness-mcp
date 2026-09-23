@@ -26,11 +26,19 @@ provider at your broker's endpoints.
 For each outbound call, `AuthResolver.resolve(service)` picks:
 
 1. An explicit **config match** — a spec whose `match` equals the service's `implementationId`,
-   then (if none) a spec whose `match` equals the service **host**.
+   then (if none) a spec whose `match` equals the service **host**. A spec matched by
+   `implementationId` must also set `host`, the host its credential was issued for.
 2. Otherwise, the **global static bearer** (`GA4GH_MCP_BEARER_TOKEN`) — but *only* for hosts in
    the allow-list `GA4GH_MCP_BEARER_HOSTS` (comma-separated). Empty allow-list ⇒ never auto-sent,
    so a token is never leaked to an unintended host.
 3. Otherwise **`none`**.
+
+The chosen credential is then **bound to one host, over https**: the spec's `host`, the host a
+spec matched by, or the `GA4GH_MCP_BEARER_HOSTS` entry. Each call site asks for headers with the
+exact URL it is about to request, and a URL with another host or a plain `http` scheme gets
+none. Matching by `implementationId` chooses which credential applies; it never decides where
+the credential may go, because a registry entry (or a federated registry) chooses its own URL.
+A credentialed request is also never followed across a redirect to another origin.
 
 On a `401`/`403`, the server parses the `WWW-Authenticate` header into an **auth hint**
 (`scheme`, `realm`, `scope`, `authorization_uri`, guidance) and returns it in the error envelope,
@@ -44,7 +52,8 @@ Set `GA4GH_MCP_AUTH_CONFIG=/path/to/auth.json`. Two accepted shapes:
 // map form — key is the match (implementationId or host)
 {
   "services": {
-    "com.sb.cgc.drs": { "kind": "bearer", "token_env": "CGC_TOKEN" },
+    "com.sb.cgc.drs": { "kind": "bearer", "token_env": "CGC_TOKEN",
+                        "host": "cgc-ga4gh-api.sbgenomics.com" },
     "data.terra.bio": {
       "kind": "oauth2_device_code",
       "device_authorization_url": "https://accounts.google.com/o/oauth2/device/code",
@@ -92,7 +101,7 @@ GA4GH_MCP_LIVE=1 pytest -q -s tests/test_live_integration.py
 ```bash
 export MY_TOKEN=abc
 cat > /tmp/auth.json <<'JSON'
-{ "services": { "org.test.drs": { "kind": "bearer", "token_env": "MY_TOKEN" } } }
+{ "services": { "org.test.drs": { "kind": "bearer", "token_env": "MY_TOKEN", "host": "drs.example.org" } } }
 JSON
 GA4GH_MCP_AUTH_CONFIG=/tmp/auth.json ga4gh-mcp --list-tools   # loads without error
 pytest -q tests/test_auth.py                                  # bearer/api_key/client_creds/device all covered

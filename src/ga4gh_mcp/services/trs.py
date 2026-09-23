@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import quote
 
-from ..auth.base import AuthProvider
+from ..auth.providers import OriginBoundAuth
 from ..http_client import Ga4ghHttpClient, HttpResult
 from .base import ServiceTypePlugin, call_api, get_plugin, register
 
@@ -19,13 +19,13 @@ register(ServiceTypePlugin(
 _PLUGIN = get_plugin("TRS")
 
 
-async def list_tools(http: Ga4ghHttpClient, service: dict[str, Any], auth: AuthProvider,
+async def list_tools(http: Ga4ghHttpClient, service: dict[str, Any], auth: OriginBoundAuth,
                      limit: int = 20) -> HttpResult:
     return await call_api(http, service, auth, "GET", "/tools",
                           plugin=_PLUGIN, params={"limit": limit})
 
 
-async def get_tool(http: Ga4ghHttpClient, service: dict[str, Any], auth: AuthProvider,
+async def get_tool(http: Ga4ghHttpClient, service: dict[str, Any], auth: OriginBoundAuth,
                    tool_id: str) -> HttpResult:
     return await call_api(http, service, auth, "GET", f"/tools/{quote(tool_id, safe='')}",
                           plugin=_PLUGIN)

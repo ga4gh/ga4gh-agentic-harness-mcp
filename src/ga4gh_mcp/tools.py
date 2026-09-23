@@ -168,8 +168,9 @@ async def call_service_endpoint(ctx: ServerContext, *, service_id: str, path: st
     if not path.startswith("/"):
         path = "/" + path
     auth = ctx.resolver.resolve(s)
-    headers = await auth.headers()
-    res = await ctx.http.request(method, base + path, headers=headers or None,
+    target = base + path
+    headers = await auth.headers_for(target)
+    res = await ctx.http.request(method, target, headers=headers or None,
                                  params=query, json_body=json_body)
     warnings = []
     if method not in {"GET", "HEAD"}:
@@ -273,10 +274,10 @@ async def auth_device_login(ctx: ServerContext, *, service_id: str,
             f"(resolved provider: {provider.kind})",
             hint="Add an oauth2_device_code entry for this service in the auth config; see docs/auth.md.",
         )
-    start = await provider.start()  # type: ignore[attr-defined]
+    start = await provider.provider.start()
     result = {"instructions": "Open the verification URI and enter the user code to authorize.",
               **start}
     if wait:
-        authorized = await provider.poll_until_authorized()  # type: ignore[attr-defined]
+        authorized = await provider.provider.poll_until_authorized()
         result["authorized"] = authorized
     return ok(result)

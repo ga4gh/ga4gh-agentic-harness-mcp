@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import quote
 
-from ..auth.base import AuthProvider
+from ..auth.providers import OriginBoundAuth
 from ..http_client import Ga4ghHttpClient, HttpResult
 from .base import ServiceTypePlugin, call_api, get_plugin, register
 
@@ -20,17 +20,17 @@ _PLUGIN = get_plugin("DataConnect")
 
 
 async def list_tables(http: Ga4ghHttpClient, service: dict[str, Any],
-                      auth: AuthProvider) -> HttpResult:
+                      auth: OriginBoundAuth) -> HttpResult:
     return await call_api(http, service, auth, "GET", "/tables", plugin=_PLUGIN)
 
 
-async def table_info(http: Ga4ghHttpClient, service: dict[str, Any], auth: AuthProvider,
+async def table_info(http: Ga4ghHttpClient, service: dict[str, Any], auth: OriginBoundAuth,
                      table: str) -> HttpResult:
     return await call_api(http, service, auth, "GET", f"/table/{quote(table, safe='.')}/info",
                           plugin=_PLUGIN)
 
 
-async def search(http: Ga4ghHttpClient, service: dict[str, Any], auth: AuthProvider,
+async def search(http: Ga4ghHttpClient, service: dict[str, Any], auth: OriginBoundAuth,
                  sql: str) -> HttpResult:
     return await call_api(http, service, auth, "POST", "/search",
                           plugin=_PLUGIN, json_body={"query": sql})

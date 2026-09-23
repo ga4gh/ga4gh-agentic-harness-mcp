@@ -6,6 +6,7 @@ from .providers import (
     NoAuth,
     OAuth2ClientCredentialsAuth,
     OAuth2DeviceCodeAuth,
+    OriginBoundAuth,
     StaticBearerAuth,
 )
 from .resolver import AuthResolver, parse_www_authenticate
@@ -18,6 +19,7 @@ __all__ = [
     "ApiKeyAuth",
     "OAuth2ClientCredentialsAuth",
     "OAuth2DeviceCodeAuth",
+    "OriginBoundAuth",
     "AuthResolver",
     "parse_www_authenticate",
 ]

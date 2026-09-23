@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
-from ..auth.base import AuthProvider
+from ..auth.providers import OriginBoundAuth
 from ..http_client import Ga4ghHttpClient, HttpResult
 
 
@@ -67,7 +67,7 @@ def api_base(service: dict[str, Any], plugin: ServiceTypePlugin | None) -> str |
 async def call_api(
     http: Ga4ghHttpClient,
     service: dict[str, Any],
-    auth: AuthProvider,
+    auth: OriginBoundAuth,
     method: str,
     subpath: str,
     *,
@@ -80,7 +80,7 @@ async def call_api(
     if not base:
         return HttpResult(url="", liveness=http_no_url(), error="no base URL for service")
     url = base + subpath
-    headers = await auth.headers()
+    headers = await auth.headers_for(url)
     return await http.request(method, url, headers=headers or None, params=params, json_body=json_body)
 
 

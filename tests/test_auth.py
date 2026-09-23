@@ -84,14 +84,15 @@ async def test_resolver_picks_config_spec(tmp_path, monkeypatch):
     monkeypatch.setenv("MY_TERRA_TOKEN", "terra-secret")
     cfg = tmp_path / "auth.json"
     cfg.write_text(json.dumps({"services": {
-        "org.test.drs": {"kind": "bearer", "token_env": "MY_TERRA_TOKEN"}}}))
+        "org.test.drs": {"kind": "bearer", "token_env": "MY_TERRA_TOKEN", "host": "x"}}}))
     settings = load_settings(auth_config=str(cfg))
     http = Ga4ghHttpClient(settings)
     resolver = AuthResolver(settings, http)
     provider = resolver.resolve({"implementationId": "org.test.drs",
                                  "serviceInfoUrl": "https://x/service-info"})
     assert provider.kind == "bearer"
-    assert await provider.headers() == {"Authorization": "Bearer terra-secret"}
+    assert await provider.headers_for("https://x/objects/1") == {
+        "Authorization": "Bearer terra-secret"}
     await http.aclose()
 
 
@@ -101,7 +102,8 @@ async def test_resolver_global_bearer_host_allowlist():
     resolver = AuthResolver(settings, http)
     on = resolver.resolve({"implementationId": "a", "serviceInfoUrl": "https://allowed.test/x"})
     off = resolver.resolve({"implementationId": "b", "serviceInfoUrl": "https://other.test/x"})
-    assert on.kind == "bearer" and await on.headers() == {"Authorization": "Bearer glob"}
+    assert on.kind == "bearer"
+    assert await on.headers_for("https://allowed.test/x") == {"Authorization": "Bearer glob"}
     assert off.kind == "none"  # not on the allow-list -> no token leaked
     await http.aclose()
 

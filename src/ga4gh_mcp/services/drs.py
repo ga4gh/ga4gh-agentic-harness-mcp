@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import quote
 
-from ..auth.base import AuthProvider
+from ..auth.providers import OriginBoundAuth
 from ..errors import ErrorType, ToolError
 from ..http_client import Ga4ghHttpClient, HttpResult
 from .base import ServiceTypePlugin, call_api, get_plugin, register
@@ -20,13 +20,13 @@ register(ServiceTypePlugin(
 _PLUGIN = get_plugin("DRS")
 
 
-async def get_object(http: Ga4ghHttpClient, service: dict[str, Any], auth: AuthProvider,
+async def get_object(http: Ga4ghHttpClient, service: dict[str, Any], auth: OriginBoundAuth,
                      object_id: str) -> HttpResult:
     return await call_api(http, service, auth, "GET", f"/objects/{quote(object_id, safe='')}",
                           plugin=_PLUGIN)
 
 
-async def get_access_url(http: Ga4ghHttpClient, service: dict[str, Any], auth: AuthProvider,
+async def get_access_url(http: Ga4ghHttpClient, service: dict[str, Any], auth: OriginBoundAuth,
                          object_id: str, access_id: str | None = None) -> dict[str, Any]:
     """Return a concrete access URL for a DRS object.
 

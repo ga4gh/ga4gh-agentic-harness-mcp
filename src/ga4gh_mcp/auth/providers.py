@@ -15,6 +15,7 @@ import os
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from ..errors import ErrorType, ToolError
 from ..http_client import Ga4ghHttpClient
@@ -254,6 +255,40 @@ class OAuth2DeviceCodeAuth:
             "token_cached": bool(self._token and time.time() < self._expires_at),
             "token_store": str(self._store) if self._store else None,
         }
+
+
+class OriginBoundAuth:
+    """A provider whose headers are released only for requests to one https origin.
+
+    The resolver wraps every provider in this before handing it to a call site, and call sites
+    ask for ``headers_for(url)`` with the exact URL they are about to request. A registry entry,
+    upstream response, or redirect that names another scheme or host gets no credential, and the
+    wrapped provider is not even asked for a token.
+    """
+
+    def __init__(self, provider: Any, *, host: str | None, allow_http: bool = False) -> None:
+        self.provider = provider
+        self.kind = provider.kind
+        self._host = host.lower() if host else None
+        self._schemes = {"https", "http"} if allow_http else {"https"}
+
+    def permits(self, url: str) -> bool:
+        if not self._host:
+            return False
+        try:
+            parts = urlsplit(url)
+            host = (parts.hostname or "").lower()
+        except ValueError:
+            return False
+        return parts.scheme.lower() in self._schemes and host == self._host
+
+    async def headers_for(self, url: str) -> dict[str, str]:
+        if not self.permits(url):
+            return {}
+        return await self.provider.headers()
+
+    def describe(self) -> dict[str, Any]:
+        return {**self.provider.describe(), "bound_host": self._host}
 
 
 def build_provider(spec: AuthSpec, http: Ga4ghHttpClient, *, token_store_dir: str | None = None):

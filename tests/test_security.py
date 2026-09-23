@@ -8,13 +8,17 @@ different origin, and must not reach loopback, private, or cloud-metadata addres
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 import respx
 
 from ga4gh_mcp import http_client as http_mod
 from ga4gh_mcp import tools
+from ga4gh_mcp.auth.resolver import AuthResolver
 from ga4gh_mcp.config import load_settings
+from ga4gh_mcp.context import ServerContext
 from ga4gh_mcp.errors import Liveness
 from ga4gh_mcp.http_client import Ga4ghHttpClient
 
@@ -119,3 +123,102 @@ async def test_private_hosts_allowed_with_explicit_local_development_flag():
     res = await c.get_json("http://127.0.0.1:18080/service-info")
     await c.aclose()
     assert route.called and res.liveness == Liveness.LIVE
+
+
+# ------------------------------------------------------------ credentials bound to origin
+
+CGC = {
+    "id": "2432a48d-99b6-4b9c-98f7-c5cbc074f680",
+    "implementationId": "com.sb.cgc.drs",
+    "serviceInfoUrl": "https://cgc-ga4gh-api.sbgenomics.com/ga4gh/drs/v1/service-info",
+    "url": "https://cgc-ga4gh-api.sbgenomics.com",
+    "standardVersion": {"ga4ghProduct": "DRS", "version": "1.2.0"},
+}
+# A second entry (another registry record, a deployment, or a federated registry) that reuses
+# the implementationId but points at a different host.
+IMPOSTOR = {
+    **CGC,
+    "id": "99999999-0000-4000-8000-000000000000",
+    "serviceInfoUrl": "https://collector.test/ga4gh/drs/v1/service-info",
+    "url": "https://collector.test",
+}
+
+
+async def _ctx_with(tmp_path, monkeypatch, services, specs, **overrides):
+    monkeypatch.setenv("CGC_TOKEN", "cgc-secret")
+    cfg = tmp_path / "auth.json"
+    cfg.write_text(json.dumps({"services": specs}))
+    settings = load_settings(registry_base_url="https://registry.test/api", max_retries=0,
+                             retry_backoff=0.0, auth_config=str(cfg), **overrides)
+    c = ServerContext.create(settings)
+    c.registry._cache.set("services", services)
+    c.registry._cache.set("deployments", [])
+    return c
+
+
+@respx.mock
+async def test_implementation_id_credential_not_sent_to_other_host(tmp_path, monkeypatch):
+    c = await _ctx_with(tmp_path, monkeypatch, [CGC, IMPOSTOR],
+                        {"com.sb.cgc.drs": {"kind": "bearer", "token_env": "CGC_TOKEN",
+                                            "host": "cgc-ga4gh-api.sbgenomics.com"}})
+    sink = respx.get("https://collector.test/ga4gh/drs/v1/objects/o1").mock(
+        return_value=httpx.Response(200, json={"id": "o1"}))
+    await tools.drs_get_object(c, service_id=IMPOSTOR["id"], object_id="o1")
+    await c.aclose()
+    assert sink.called
+    assert "authorization" not in sink.calls.last.request.headers
+
+
+@respx.mock
+async def test_implementation_id_credential_sent_to_its_own_host(tmp_path, monkeypatch):
+    c = await _ctx_with(tmp_path, monkeypatch, [CGC],
+                        {"com.sb.cgc.drs": {"kind": "bearer", "token_env": "CGC_TOKEN",
+                                            "host": "cgc-ga4gh-api.sbgenomics.com"}})
+    route = respx.get("https://cgc-ga4gh-api.sbgenomics.com/ga4gh/drs/v1/objects/o1").mock(
+        return_value=httpx.Response(200, json={"id": "o1"}))
+    out = await tools.drs_get_object(c, service_id=CGC["id"], object_id="o1")
+    await c.aclose()
+    assert out["ok"] is True
+    assert route.calls.last.request.headers["authorization"] == "Bearer cgc-secret"
+
+
+@respx.mock
+async def test_implementation_id_spec_without_host_sends_nothing(tmp_path, monkeypatch):
+    # An implementationId alone names no destination, so it cannot scope a credential.
+    c = await _ctx_with(tmp_path, monkeypatch, [IMPOSTOR],
+                        {"com.sb.cgc.drs": {"kind": "bearer", "token_env": "CGC_TOKEN"}})
+    sink = respx.get("https://collector.test/ga4gh/drs/v1/objects/o1").mock(
+        return_value=httpx.Response(200, json={"id": "o1"}))
+    await tools.drs_get_object(c, service_id=IMPOSTOR["id"], object_id="o1")
+    status = await tools.auth_status(c)
+    await c.aclose()
+    assert "authorization" not in sink.calls.last.request.headers
+    assert status["data"]["configured_specs"][0]["host"] is None
+    assert "implementationId match sends nothing" in status["data"]["configured_specs"][0]["note"]
+
+
+@respx.mock
+async def test_global_bearer_not_sent_over_plain_http(ctx):
+    ctx.settings.bearer_token = "glob"
+    ctx.settings.bearer_hosts = "allowed.test"
+    svc = {"id": "plain-1", "implementationId": "plain-1",
+           "serviceInfoUrl": "http://allowed.test/ga4gh/drs/v1/service-info",
+           "standardVersion": {"ga4ghProduct": "DRS", "version": "1.2.0"}}
+    ctx.registry._cache.set("services", [svc])
+    route = respx.get("http://allowed.test/ga4gh/drs/v1/objects/o1").mock(
+        return_value=httpx.Response(200, json={"id": "o1"}))
+    await tools.drs_get_object(ctx, service_id="plain-1", object_id="o1")
+    assert "authorization" not in route.calls.last.request.headers
+
+
+async def test_bound_provider_only_yields_headers_for_its_origin():
+    settings = load_settings(bearer_token="glob", bearer_hosts="allowed.test")
+    c = Ga4ghHttpClient(settings)
+    auth = AuthResolver(settings, c).resolve(
+        {"implementationId": "a", "serviceInfoUrl": "https://allowed.test/x"})
+    assert await auth.headers_for("https://allowed.test/y") == {"Authorization": "Bearer glob"}
+    assert await auth.headers_for("https://ALLOWED.test:443/y") == {"Authorization": "Bearer glob"}
+    for url in ("http://allowed.test/y", "https://allowed.test.evil.test/y",
+                "https://evil.test/y", "https://sub.allowed.test/y"):
+        assert await auth.headers_for(url) == {}, url
+    await c.aclose()

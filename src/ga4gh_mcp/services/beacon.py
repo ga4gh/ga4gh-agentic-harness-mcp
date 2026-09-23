@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..auth.base import AuthProvider
+from ..auth.providers import OriginBoundAuth
 from ..http_client import Ga4ghHttpClient, HttpResult
 from .base import ServiceTypePlugin, register
 
@@ -23,10 +23,10 @@ register(ServiceTypePlugin(
 
 
 async def beacon_info(http: Ga4ghHttpClient, service: dict[str, Any],
-                      auth: AuthProvider) -> HttpResult:
+                      auth: OriginBoundAuth) -> HttpResult:
     url = service.get("serviceInfoUrl")
     if not url:
         base = (service.get("url") or "").rstrip("/")
         url = f"{base}/info" if base else ""
-    headers = await auth.headers()
+    headers = await auth.headers_for(url)
     return await http.request("GET", url, headers=headers or None)

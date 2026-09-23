@@ -30,6 +30,9 @@ class AuthSpec:
 
     kind: str = "none"  # none | bearer | api_key | oauth2_client_credentials | oauth2_device_code
     match: str | None = None  # implementationId or host this spec applies to
+    # Host the credential was issued for. Required when ``match`` is an implementationId: a
+    # registry entry chooses its own URL, so an identifier alone cannot scope a secret.
+    host: str | None = None
     # bearer / api_key
     token_env: str | None = None
     header: str | None = None  # api_key header name (default "Authorization")

@@ -56,7 +56,7 @@ async def check_liveness(
         report.warnings.append(f"serviceInfoUrl not registered; inferred as {url}")
 
     auth = resolver.resolve(service)
-    headers = await auth.headers()
+    headers = await auth.headers_for(url)
     res = await http.get_json(url, headers=headers or None)
 
     report.liveness = res.liveness
