@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     def agentic_write_scope_list(self) -> list[str]:
         return [s.strip() for s in self.agentic_write_scopes.split(",") if s.strip()]
 
+    # call_service_endpoint sends only GET/HEAD unless this is set. The registry-oriented tools
+    # have no per-call confirmation, so mutating methods need an operator decision up front.
+    allow_write_methods: bool = False
+
     # --- Caching ---
     registry_cache_ttl: float = 300.0  # seconds; registry lists change slowly
     liveness_cache_ttl: float = 30.0  # seconds; per-service probe results

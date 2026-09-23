@@ -21,6 +21,7 @@ from ga4gh_mcp.config import load_settings
 from ga4gh_mcp.context import ServerContext
 from ga4gh_mcp.errors import Liveness
 from ga4gh_mcp.http_client import Ga4ghHttpClient
+from ga4gh_mcp.server import build_server
 
 
 def _client(**overrides):
@@ -268,3 +269,49 @@ async def test_drs_object_inline_access_url_capabilities_are_redacted(ctx):
     assert out["ok"] is True and out["data"]["id"] == "o1"
     for secret in ("storage-token-789", "sig123", "cred456"):
         assert secret not in blob
+
+
+# ------------------------------------------------ registry-oriented tool annotations + gate
+
+_LEGACY_WRITERS = {"call_service_endpoint", "auth_device_login"}
+
+
+async def test_registry_tools_declare_annotations():
+    c = ServerContext.create(load_settings())
+    mcp = build_server(load_settings(), ctx=c)
+    listed = {t.name: t.annotations for t in await mcp.list_tools()}
+    await c.aclose()
+    for name, ann in listed.items():
+        assert ann is not None, name
+        assert ann.readOnlyHint is (name not in _LEGACY_WRITERS), name
+    assert listed["call_service_endpoint"].destructiveHint is True
+    assert listed["call_service_endpoint"].openWorldHint is True
+    assert listed["auth_status"].openWorldHint is False
+
+
+@pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE"])
+@respx.mock
+async def test_call_service_endpoint_refuses_writes_by_default(ctx, method):
+    route = respx.route(host="drs.test").mock(return_value=httpx.Response(200, json={}))
+    out = await tools.call_service_endpoint(_drs_ctx(ctx), service_id="drs-sec",
+                                            path="/objects/o1", method=method)
+    assert not route.called
+    assert out["ok"] is False and out["error"]["type"] == "validation"
+
+
+@respx.mock
+async def test_call_service_endpoint_writes_need_explicit_setting(ctx):
+    ctx.settings.allow_write_methods = True
+    route = respx.delete(f"{DRS_BASE}/objects/o1").mock(return_value=httpx.Response(200, json={}))
+    out = await tools.call_service_endpoint(_drs_ctx(ctx), service_id="drs-sec",
+                                            path="/objects/o1", method="DELETE")
+    assert route.called and out["ok"] is True
+
+
+@pytest.mark.parametrize("path", ["/../../../admin", "/objects/../../../x", "/./objects", "/%2e%2e/x"])
+@respx.mock
+async def test_call_service_endpoint_path_cannot_leave_api_base(ctx, path):
+    route = respx.route(host="drs.test").mock(return_value=httpx.Response(200, json={}))
+    out = await tools.call_service_endpoint(_drs_ctx(ctx), service_id="drs-sec", path=path)
+    assert out["ok"] is False
+    assert not route.called

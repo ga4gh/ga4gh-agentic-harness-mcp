@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from functools import wraps
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 from .auth.resolver import parse_www_authenticate
 from .context import ServerContext
@@ -158,6 +159,15 @@ async def call_service_endpoint(ctx: ServerContext, *, service_id: str, path: st
     method = method.upper()
     if method not in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"}:
         raise ToolError(ErrorType.VALIDATION, f"unsupported method: {method}")
+    if method not in {"GET", "HEAD"} and not ctx.settings.allow_write_methods:
+        raise ToolError(
+            ErrorType.VALIDATION,
+            f"{method} is disabled for call_service_endpoint",
+            hint="Mutating calls need GA4GH_MCP_ALLOW_WRITE_METHODS=true, set by the operator.",
+        )
+    if any(unquote(seg) in {".", ".."} for seg in urlsplit(path).path.split("/")):
+        raise ToolError(ErrorType.VALIDATION, "path may not contain '.' or '..' segments",
+                        hint="`path` is relative to the service API base and cannot leave it.")
     s = await ctx.registry.get_service(service_id)
     product = (s.get("standardVersion") or {}).get("ga4ghProduct")
     plugin = get_plugin(product)
