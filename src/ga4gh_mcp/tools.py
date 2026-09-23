@@ -204,7 +204,12 @@ async def _service_and_auth(ctx: ServerContext, service_id: str, expected_produc
 @guarded
 async def drs_get_object(ctx: ServerContext, *, service_id: str, object_id: str) -> dict[str, Any]:
     s, auth = await _service_and_auth(ctx, service_id, "DRS")
-    return _res_envelope(await drs_mod.get_object(ctx.http, s, auth, object_id))
+    res = await drs_mod.get_object(ctx.http, s, auth, object_id)
+    if res.status == 404:
+        return err(ErrorType.NOT_FOUND, f"no DRS object with id '{object_id}'",
+                   detail={"object_id": object_id, "http_status": 404},
+                   hint=drs_mod.DRS_NOT_FOUND_HINT)
+    return _res_envelope(res)
 
 
 @guarded

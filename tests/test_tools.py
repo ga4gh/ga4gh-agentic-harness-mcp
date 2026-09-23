@@ -114,6 +114,26 @@ async def test_drs_get_access_url_inline(ctx):
 
 
 @respx.mock
+async def test_drs_get_object_not_found_returns_guidance(ctx):
+    _preload(ctx)
+    respx.get(f"{DRS_BASE}/objects/guessed-id").mock(return_value=httpx.Response(404, text="nope"))
+    r = await tools.drs_get_object(ctx, service_id="org.test.drs", object_id="guessed-id")
+    assert r["ok"] is False and r["error"]["type"] == "not_found"
+    # The hint must steer the caller away from guessing and toward real id sources.
+    hint = r["error"]["hint"].lower()
+    assert "do not retry" in hint and "data connect" in hint
+
+
+@respx.mock
+async def test_drs_get_access_url_not_found_returns_guidance(ctx):
+    _preload(ctx)
+    respx.get(f"{DRS_BASE}/objects/guessed-id").mock(return_value=httpx.Response(404, text="nope"))
+    r = await tools.drs_get_access_url(ctx, service_id="org.test.drs", object_id="guessed-id")
+    assert r["ok"] is False and r["error"]["type"] == "not_found"
+    assert "hint" in r["error"]
+
+
+@respx.mock
 async def test_drs_get_access_url_dereference(ctx):
     _preload(ctx)
     respx.get(f"{DRS_BASE}/objects/obj2").mock(return_value=httpx.Response(200, json={
