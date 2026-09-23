@@ -21,6 +21,18 @@ from .errors import Liveness
 
 # HTTP statuses worth retrying (transient).
 _RETRY_STATUS = {429, 500, 502, 503, 504}
+_MAX_REDIRECTS = 5
+
+
+def origin(url: str | httpx.URL) -> tuple[str, str, int | None]:
+    """(scheme, host, port) of a URL, parsed the way httpx will send it."""
+    u = url if isinstance(url, httpx.URL) else httpx.URL(url)
+    port = u.port or {"https": 443, "http": 80}.get(u.scheme)
+    return u.scheme, u.host.lower().rstrip("."), port
+
+
+class RedirectRefused(Exception):
+    """A redirect would have re-sent a request body to a different origin."""
 
 
 @dataclass
@@ -93,7 +105,9 @@ class Ga4ghHttpClient:
             self._client = httpx.AsyncClient(
                 timeout=timeout,
                 verify=self._settings.verify_tls,
-                follow_redirects=True,
+                # Redirects are followed by ``_send`` so credentials stay bound to the origin
+                # they were resolved for (httpx itself strips only ``Authorization``).
+                follow_redirects=False,
                 headers={
                     "User-Agent": self._settings.user_agent,
                     "Accept": "application/json",
@@ -123,10 +137,13 @@ class Ga4ghHttpClient:
         for attempt in range(attempts):
             start = time.monotonic()
             try:
-                resp = await client.request(
+                resp = await self._send(client, client.build_request(
                     method.upper(), url, headers=headers, params=params,
                     json=json_body, data=data,
-                )
+                ), caller_headers=headers)
+            except RedirectRefused as exc:
+                return HttpResult(url=url, liveness=Liveness.HTTP_ERROR, error=str(exc),
+                                  latency_ms=int((time.monotonic() - start) * 1000))
             except Exception as exc:  # noqa: BLE001 - deliberately broad; classify below
                 liveness, msg = classify_exception(exc)
                 last = HttpResult(url=url, liveness=liveness, error=msg,
@@ -149,6 +166,33 @@ class Ga4ghHttpClient:
             return result
         assert last is not None
         return last
+
+    async def _send(self, client: httpx.AsyncClient, request: httpx.Request, *,
+                    caller_headers: dict[str, str] | None) -> httpx.Response:
+        """Send ``request``, following redirects without carrying credentials across origins.
+
+        Caller-supplied headers (auth headers from a provider, API keys) are dropped as soon
+        as a hop leaves the original (scheme, host, port), and a redirect that would re-send a
+        request body (307/308) to another origin is refused outright.
+        """
+        start_origin = origin(request.url)
+        drop = {k.lower() for k in (caller_headers or {})}
+        for _ in range(_MAX_REDIRECTS + 1):
+            resp = await client.send(request)
+            nxt = resp.next_request
+            if nxt is None:
+                return resp
+            await resp.aclose()
+            if origin(nxt.url) != start_origin:
+                if nxt.content:
+                    raise RedirectRefused(
+                        f"refused {resp.status_code} redirect that would re-send the request "
+                        f"body to a different origin ({nxt.url.scheme}://{nxt.url.host})")
+                for name in list(nxt.headers.keys()):
+                    if name.lower() in drop or name.lower() in ("authorization", "cookie"):
+                        del nxt.headers[name]
+            request = nxt
+        raise httpx.TooManyRedirects(f"exceeded {_MAX_REDIRECTS} redirects", request=request)
 
     def _build_result(self, url: str, resp: httpx.Response, latency: int) -> HttpResult:
         # Bound how much we buffer/parse from any single upstream.
