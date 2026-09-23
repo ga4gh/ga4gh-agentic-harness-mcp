@@ -154,7 +154,7 @@ async def _ctx_with(tmp_path, monkeypatch, services, specs, **overrides):
     monkeypatch.setenv("CGC_TOKEN", "cgc-secret")
     cfg = tmp_path / "auth.json"
     cfg.write_text(json.dumps({"services": specs}))
-    settings = load_settings(registry_base_url="https://registry.test/api", max_retries=0,
+    settings = load_settings(registries=[{"url": "https://registry.test/api", "api": "implementation-registry"}], max_retries=0,
                              retry_backoff=0.0, auth_config=str(cfg), **overrides)
     c = ServerContext.create(settings)
     c.registry._cache.set("services", services)

@@ -36,8 +36,8 @@ To use a GA4GH Service Registry on localhost, opt in explicitly:
 ```bash
 uv run ga4gh-mcp --transport streamable-http \
   --host 127.0.0.1 --port 8765 --path /mcp \
-  --registry-url http://127.0.0.1:18080/ga4gh/registry \
-  --agentic-allow-http --agentic-allow-private-hosts
+  --registry service-registry=http://127.0.0.1:18080/ga4gh/registry \
+  --agentic-allow-private-hosts
 ```
 
 `GA4GH_MCP_AGENTIC_ALLOWED_HOSTS` can further constrain upstream destinations.

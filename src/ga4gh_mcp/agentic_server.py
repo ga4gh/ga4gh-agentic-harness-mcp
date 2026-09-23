@@ -69,7 +69,7 @@ def _structured(result: ResultEnvelope[Any]) -> dict[str, Any]:
 def _harness_settings(settings: Settings) -> HarnessSettings:
     """Map shared runtime settings while retaining SDK security defaults."""
     return HarnessSettings(
-        registry_base_url=settings.registry_base_url,
+        registries=[source.model_dump() for source in settings.registries],
         connect_timeout_seconds=settings.connect_timeout,
         read_timeout_seconds=settings.read_timeout,
         retry_backoff_seconds=settings.retry_backoff,

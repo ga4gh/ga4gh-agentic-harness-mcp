@@ -24,8 +24,12 @@ FED_SERVICES = [
 
 
 def _ctx():
-    settings = load_settings(registry_base_url="https://registry.test/api",
-                             extra_registries=FED, max_retries=0, retry_backoff=0.0)
+    settings = load_settings(
+        registries=[
+            {"url": "https://registry.test/api", "api": "implementation-registry"},
+            {"url": FED.removesuffix("/services"), "api": "service-registry"},
+        ],
+        max_retries=0, retry_backoff=0.0)
     ctx = ServerContext.create(settings)
     ctx.registry._cache.set("services", [])       # avoid hitting the real registry
     ctx.registry._cache.set("deployments", [])

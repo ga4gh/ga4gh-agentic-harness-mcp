@@ -9,10 +9,29 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Transport = Literal["stdio", "streamable-http"]
+RegistryApi = Literal["implementation-registry", "service-registry"]
+
+
+class RegistrySource(BaseModel):
+    """One registry this server discovers services from.
+
+    ``api`` says which API the URL speaks; it is declared, never probed. Every entry feeds
+    service listing, search and lookup through ``{url}/services``. Only Implementation Registry
+    entries also back standards, organisations and deployments, which Service Registries lack.
+    """
+
+    url: str
+    api: RegistryApi
+
+
+GA4GH_IMPLEMENTATION_REGISTRY = RegistrySource(
+    url="https://implementation-registry.ga4gh.org/api", api="implementation-registry"
+)
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="GA4GH_MCP_",
@@ -22,14 +41,23 @@ class Settings(BaseSettings):
     )
 
     # --- Registry ---
-    registry_base_url: str = "https://implementation-registry.ga4gh.org/api"
-    # Comma-separated GA4GH Service Registry `/services` URLs to federate alongside the public
-    # Implementation Registry (e.g. a ga4gh-aws-opendata deployment). Their services appear in
-    # list_services / get_service / health / DRS / Data Connect exactly like registered ones.
-    extra_registries: str = ""
+    # Every registry that feeds discovery. The default is the GA4GH Implementation Registry;
+    # setting the list replaces it, so add it back explicitly to keep it. Environment:
+    # GA4GH_MCP_REGISTRIES='[{"url": "http://127.0.0.1:8899/ga4gh/registry",
+    #                         "api": "service-registry"}]'
+    registries: list[RegistrySource] = Field(
+        default_factory=lambda: [GA4GH_IMPLEMENTATION_REGISTRY.model_copy()]
+    )
 
-    def extra_registry_urls(self) -> list[str]:
-        return [u.strip() for u in self.extra_registries.split(",") if u.strip()]
+    @field_validator("registries")
+    @classmethod
+    def _at_least_one_registry(cls, value: list[RegistrySource]) -> list[RegistrySource]:
+        if not value:
+            raise ValueError("at least one registry is required")
+        return value
+
+    def registry_urls(self, api: RegistryApi) -> list[str]:
+        return [r.url.rstrip("/") for r in self.registries if r.api == api]
 
     # --- Transport ---
     transport: Transport = "stdio"

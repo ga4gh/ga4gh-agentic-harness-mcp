@@ -18,7 +18,7 @@ META = "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
 
 
 def _ctx(**kw):
-    s = load_settings(registry_base_url="https://registry.test/api", max_retries=0,
+    s = load_settings(registries=[{"url": "https://registry.test/api", "api": "implementation-registry"}], max_retries=0,
                       retry_backoff=0.0, **kw)
     return ServerContext.create(s)
 
