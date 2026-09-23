@@ -26,7 +26,7 @@ from ga4gh_mcp.config import load_settings
 from ga4gh_mcp.context import ServerContext
 from ga4gh_mcp.errors import Liveness
 from ga4gh_mcp.http_client import Ga4ghHttpClient
-from ga4gh_mcp.server import build_server
+from ga4gh_mcp.server import REGISTRY_TOOL_NAMES, build_server
 
 
 def _client(**overrides):
@@ -284,7 +284,8 @@ _LEGACY_WRITERS = {"auth_device_login"}
 async def test_registry_tools_declare_annotations():
     c = ServerContext.create(load_settings())
     mcp = build_server(load_settings(), ctx=c)
-    listed = {t.name: t.annotations for t in await mcp.list_tools()}
+    listed = {t.name: t.annotations for t in await mcp.list_tools()
+              if t.name in REGISTRY_TOOL_NAMES}
     await c.aclose()
     for name, ann in listed.items():
         assert ann is not None, name

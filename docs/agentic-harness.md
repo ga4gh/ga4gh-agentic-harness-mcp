@@ -3,7 +3,8 @@
 This server is a thin MCP projection over the local
 `ga4gh-agentic-harness-python` SDK. It exposes the 13 canonical tool names in the
 Agentic Harness MCP crosswalk and returns the SDK's Harness result envelope as
-MCP structured content.
+MCP structured content. The same server also registers the 21 registry and service tools in
+`server.py`; see the README.
 
 ## Local development
 

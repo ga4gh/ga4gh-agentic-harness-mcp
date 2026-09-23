@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
@@ -17,6 +18,7 @@ from ga4gh_mcp.agentic_server import (
     build_agentic_server,
 )
 from ga4gh_mcp.config import load_settings
+from ga4gh_mcp.server import REGISTRY_TOOL_NAMES, TOOL_NAMES, build_server
 
 
 class RecordingHarness:
@@ -232,14 +234,6 @@ def test_agentic_local_exceptions_and_write_scopes_are_explicit():
     assert harness.settings.allowed_hosts == ["127.0.0.1"]
 
 
-def test_cli_lists_harness_tools(capsys):
-    assert main(["--list-tools"]) == 0
-    output = capsys.readouterr().out
-    assert '"profile": "ga4gh-agentic-harness"' in output
-    assert '"ga4gh_harness_describe"' in output
-    assert '"count": 13' in output
-
-
 @pytest.mark.parametrize("host", ["0.0.0.0", "::", "10.0.0.5", "mcp.example.org"])
 def test_write_scopes_refused_on_unauthenticated_network_bind(host: str):
     # The streamable-HTTP transport has no inbound authorization, so every client that can reach
@@ -281,7 +275,15 @@ async def test_annotations_reflect_remote_calls_and_side_effects():
     assert tools["ga4gh_wes_run_cancel"].idempotentHint is True
 
 
-def test_cli_lists_legacy_surface(capsys):
-    assert main(["--surface", "legacy", "--list-tools"]) == 0
-    output = capsys.readouterr().out
-    assert '"surface": "legacy"' in output and "data_connect_search" in output
+def test_cli_lists_every_tool_on_one_server(capsys):
+    assert main(["--list-tools"]) == 0
+    listed = json.loads(capsys.readouterr().out)
+    assert listed["count"] == len(AGENTIC_TOOL_NAMES) + len(REGISTRY_TOOL_NAMES)
+    assert {"ga4gh_beacon_variant_query", "data_connect_search"} <= set(listed["tools"])
+
+
+async def test_one_server_registers_both_tool_sets_without_collisions():
+    mcp = build_server(load_settings(), harness=RecordingHarness())  # type: ignore[arg-type]
+    names = [tool.name for tool in await mcp.list_tools()]
+    assert len(names) == len(set(names)) == len(TOOL_NAMES)
+    assert set(names) == set(AGENTIC_TOOL_NAMES) | set(REGISTRY_TOOL_NAMES)

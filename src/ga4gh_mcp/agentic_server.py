@@ -116,22 +116,17 @@ def build_agentic_server(
     *,
     harness: Harness | None = None,
 ) -> FastMCP:
-    """Build the canonical MCP tool surface over one SDK ``Harness`` instance."""
+    """Build a server with only the canonical Harness tools (see server.build_server for all)."""
     settings = settings or load_settings()
-    _check_write_scope_exposure(settings)
+    sdk: Harness | None = None
     owns_harness = harness is None
-    sdk = harness or Harness(settings=_harness_settings(settings))
-    authority = AuthorityContext(
-        software_actor="local-mcp",
-        inbound_scopes=settings.agentic_write_scope_list(),
-    )
 
     @asynccontextmanager
     async def lifespan(_server: FastMCP):
         try:
             yield {}
         finally:
-            if owns_harness:
+            if owns_harness and sdk is not None:
                 await sdk.aclose()
 
     mcp = FastMCP(
@@ -142,6 +137,26 @@ def build_agentic_server(
         streamable_http_path=settings.http_path,
         stateless_http=settings.stateless_http,
         lifespan=lifespan,
+    )
+    sdk = register_harness_tools(mcp, settings, harness=harness)
+    return mcp
+
+
+def register_harness_tools(
+    mcp: FastMCP,
+    settings: Settings,
+    *,
+    harness: Harness | None = None,
+) -> Harness:
+    """Register the canonical Harness tools on ``mcp`` and return the SDK Harness they use.
+
+    The caller owns closing the returned Harness when it created it (``harness`` is None).
+    """
+    _check_write_scope_exposure(settings)
+    sdk = harness or Harness(settings=_harness_settings(settings))
+    authority = AuthorityContext(
+        software_actor="local-mcp",
+        inbound_scopes=settings.agentic_write_scope_list(),
     )
 
     async def invoke(operation: Operation, payload: dict[str, Any]) -> dict[str, Any]:
@@ -358,4 +373,4 @@ def build_agentic_server(
         )
 
     mcp._ga4gh_harness = sdk  # type: ignore[attr-defined]
-    return mcp
+    return sdk

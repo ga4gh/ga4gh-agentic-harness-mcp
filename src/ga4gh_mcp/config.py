@@ -13,7 +13,6 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Transport = Literal["stdio", "streamable-http"]
-Surface = Literal["agentic", "legacy"]
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="GA4GH_MCP_",
@@ -31,11 +30,6 @@ class Settings(BaseSettings):
 
     def extra_registry_urls(self) -> list[str]:
         return [u.strip() for u in self.extra_registries.split(",") if u.strip()]
-
-    # --- Tool surface ---
-    # agentic: the Agentic Harness tools (agentic_server.py). legacy: the registry, DRS, Data
-    # Connect, TRS, TES and Beacon tools (server.py).
-    surface: Surface = "agentic"
 
     # --- Transport ---
     transport: Transport = "stdio"

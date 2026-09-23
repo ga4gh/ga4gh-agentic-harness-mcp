@@ -9,11 +9,17 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import Any
 
+from ga4gh_agentic_harness import Harness
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from . import tools
-from .agentic_server import _is_loopback_host
+from .agentic_server import (
+    AGENTIC_TOOL_NAMES,
+    _is_loopback_host,
+    register_harness_tools,
+)
+from .agentic_server import INSTRUCTIONS as HARNESS_INSTRUCTIONS
 from .config import Settings, load_settings
 from .context import ServerContext
 
@@ -73,10 +79,15 @@ def _check_write_method_exposure(settings: Settings) -> None:
 
 
 def build_server(settings: Settings | None = None,
-                 ctx: ServerContext | None = None) -> FastMCP:
+                 ctx: ServerContext | None = None,
+                 *,
+                 harness: Harness | None = None) -> FastMCP:
+    """The one GA4GH MCP server: the canonical Harness tools plus the registry, DRS, Data
+    Connect, TRS, TES and Beacon tools registered in this module."""
     settings = settings or load_settings()
-    _check_write_method_exposure(settings)
     context = ctx or ServerContext.create(settings)
+    sdk: Harness | None = None
+    owns_harness = harness is None
 
     @asynccontextmanager
     async def lifespan(_server: FastMCP):
@@ -84,16 +95,26 @@ def build_server(settings: Settings | None = None,
             yield {}
         finally:
             await context.aclose()
+            if owns_harness and sdk is not None:
+                await sdk.aclose()
 
     mcp = FastMCP(
         name="ga4gh-agentic-harness-mcp",
-        instructions=INSTRUCTIONS,
+        instructions=INSTRUCTIONS + "\n" + HARNESS_INSTRUCTIONS,
         host=settings.host,
         port=settings.port,
         streamable_http_path=settings.http_path,
         stateless_http=settings.stateless_http,
         lifespan=lifespan,
     )
+    register_registry_tools(mcp, settings, context)
+    sdk = register_harness_tools(mcp, settings, harness=harness)
+    return mcp
+
+
+def register_registry_tools(mcp: FastMCP, settings: Settings, context: ServerContext) -> None:
+    """Register the registry, DRS, Data Connect, TRS, TES, Beacon, generic and auth tools."""
+    _check_write_method_exposure(settings)
 
     # ---------------------------------------------------------------- registry tools
     @mcp.tool(annotations=_READ)
@@ -263,10 +284,9 @@ def build_server(settings: Settings | None = None,
         return await tools.auth_device_login(context, service_id=service_id, wait=wait)
 
     mcp._ga4gh_context = context  # type: ignore[attr-defined]  # handle for tests/shutdown
-    return mcp
 
 
-TOOL_NAMES = [
+REGISTRY_TOOL_NAMES = [
     "list_services", "get_service", "search_services", "list_service_types", "list_standards",
     "list_organisations", "check_service_health", "get_service_info", "call_service_endpoint",
     "drs_get_object", "drs_get_access_url", "trs_list_tools", "trs_get_tool",
@@ -274,3 +294,5 @@ TOOL_NAMES = [
     "data_connect_list_tables", "data_connect_table_info", "data_connect_search",
     "auth_status", "auth_device_login",
 ]
+
+TOOL_NAMES = AGENTIC_TOOL_NAMES + REGISTRY_TOOL_NAMES

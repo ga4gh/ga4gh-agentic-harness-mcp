@@ -6,8 +6,8 @@ import httpx
 import respx
 
 from ga4gh_mcp.config import load_settings
-from ga4gh_mcp.server import TOOL_NAMES, build_server
 from ga4gh_mcp.context import ServerContext
+from ga4gh_mcp.server import TOOL_NAMES, build_server
 
 
 async def test_all_tools_register_with_schemas():
