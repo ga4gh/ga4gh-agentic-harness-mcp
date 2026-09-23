@@ -16,19 +16,25 @@ and the server degrades gracefully instead of failing.
 ## Install
 
 ```bash
-git clone https://github.com/mfiume/ga4gh-agentic-harness-mcp && cd ga4gh-agentic-harness-mcp
+git clone https://github.com/ga4gh/ga4gh-agentic-harness-mcp && cd ga4gh-agentic-harness-mcp
 uv venv && . .venv/bin/activate      # or: python -m venv .venv && . .venv/bin/activate
 uv pip install -e ".[dev]"           # or: pip install -e ".[dev]"
 ```
 
-For local Agentic Harness development, keep
-`ga4gh-agentic-harness-python` beside this checkout and use `uv sync --extra dev`.
-The editable SDK path is declared in `pyproject.toml`.
+The Harness SDK is installed from
+[`ga4gh/ga4gh-agentic-harness-python`](https://github.com/ga4gh/ga4gh-agentic-harness-python)
+(see `[tool.uv.sources]` in `pyproject.toml`). To develop against a local SDK checkout, sync
+and then install it editable over the locked copy:
+
+```bash
+uv sync --extra dev
+uv pip install -e ../ga4gh-agentic-harness-python
+```
 
 Run directly with no clone via uvx:
 
 ```bash
-uvx --from git+https://github.com/mfiume/ga4gh-agentic-harness-mcp ga4gh-mcp --list-tools
+uvx --from git+https://github.com/ga4gh/ga4gh-agentic-harness-mcp ga4gh-mcp --list-tools
 ```
 
 ## Run

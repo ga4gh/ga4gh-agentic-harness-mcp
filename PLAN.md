@@ -4,7 +4,7 @@ A universal **MCP server for GA4GH services**. v1 capability: list & access serv
 [GA4GH Implementation Registry](https://implementation-registry.ga4gh.org/), built to tolerate the
 real-world variance in liveness, spec compliance, and version across registered implementations.
 
-- **Repo:** `mfiume/ga4gh-agentic-harness-mcp`
+- **Repo:** `ga4gh/ga4gh-agentic-harness-mcp` (forked from `mfiume/ga4gh-agentic-harness-mcp` into the GA4GH org, 2026-09-23)
 - **Stack:** Python ≥3.10, official MCP Python SDK (`mcp` 1.28.1), `httpx`, `pydantic`.
 - **Transports:** `stdio` (Claude Desktop/Code) and `streamable-http` (Vertex, Bedrock, remote).
 - **Status:** 🟢 shipping — see Progress log at bottom.
