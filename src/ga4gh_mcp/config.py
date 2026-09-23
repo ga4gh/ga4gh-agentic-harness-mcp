@@ -48,6 +48,15 @@ class Settings(BaseSettings):
     verify_tls: bool = True
     user_agent: str = "ga4gh-mcp-service/0.1 (+https://github.com/mfiume/ga4gh-mcp-service)"
     max_response_bytes: int = 2_000_000  # cap on any single upstream body we buffer
+    # Refuse outbound requests (and redirect hops) to loopback, private, link-local (cloud
+    # metadata, 169.254.169.254) and other non-global addresses. None => on for hosted
+    # transports (streamable-http), off for stdio, where the caller already owns the network.
+    block_private_addresses: bool | None = None
+
+    def blocks_private_addresses(self) -> bool:
+        if self.block_private_addresses is not None:
+            return self.block_private_addresses
+        return self.transport != "stdio"
 
     # --- Caching ---
     registry_cache_ttl: float = 300.0  # seconds; registry lists change slowly

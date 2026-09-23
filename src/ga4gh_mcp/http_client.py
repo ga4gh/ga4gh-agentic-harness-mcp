@@ -8,6 +8,7 @@ pages) become *structured* outcomes instead of exceptions that could crash a too
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import socket
 import ssl
 import time
@@ -33,6 +34,32 @@ def origin(url: str | httpx.URL) -> tuple[str, str, int | None]:
 
 class RedirectRefused(Exception):
     """A redirect would have re-sent a request body to a different origin."""
+
+
+class BlockedAddress(Exception):
+    """The destination resolves to a non-global address and private addresses are blocked."""
+
+
+async def _ensure_public(url: httpx.URL) -> None:
+    """Raise :class:`BlockedAddress` if ``url``'s host is, or resolves to, a non-global IP.
+
+    An unresolvable name is left to the request itself, which then fails as a DNS error.
+    """
+    host = url.host
+    try:
+        addrs = {ipaddress.ip_address(host)}
+    except ValueError:
+        try:
+            infos = await asyncio.get_running_loop().getaddrinfo(
+                host, url.port or 443, type=socket.SOCK_STREAM)
+        except OSError:
+            return
+        addrs = {ipaddress.ip_address(i[4][0].split("%", 1)[0]) for i in infos}
+    for a in addrs:
+        if not a.is_global:
+            raise BlockedAddress(
+                f"refused request to non-public address {a} ({host}); set "
+                f"GA4GH_MCP_BLOCK_PRIVATE_ADDRESSES=false to allow private destinations")
 
 
 @dataclass
@@ -141,8 +168,10 @@ class Ga4ghHttpClient:
                     method.upper(), url, headers=headers, params=params,
                     json=json_body, data=data,
                 ), caller_headers=headers)
-            except RedirectRefused as exc:
-                return HttpResult(url=url, liveness=Liveness.HTTP_ERROR, error=str(exc),
+            except (RedirectRefused, BlockedAddress) as exc:
+                liveness = (Liveness.CONNECTION_ERROR if isinstance(exc, BlockedAddress)
+                            else Liveness.HTTP_ERROR)
+                return HttpResult(url=url, liveness=liveness, error=str(exc),
                                   latency_ms=int((time.monotonic() - start) * 1000))
             except Exception as exc:  # noqa: BLE001 - deliberately broad; classify below
                 liveness, msg = classify_exception(exc)
@@ -178,6 +207,8 @@ class Ga4ghHttpClient:
         start_origin = origin(request.url)
         drop = {k.lower() for k in (caller_headers or {})}
         for _ in range(_MAX_REDIRECTS + 1):
+            if self._settings.blocks_private_addresses():
+                await _ensure_public(request.url)
             resp = await client.send(request)
             nxt = resp.next_request
             if nxt is None:

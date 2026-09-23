@@ -38,7 +38,13 @@ ga4gh-mcp --transport streamable-http --host 0.0.0.0 --port 8000 --path /mcp
 
 All options are also env vars (prefix `GA4GH_MCP_`): `GA4GH_MCP_TRANSPORT`, `GA4GH_MCP_HOST`,
 `GA4GH_MCP_PORT`, `GA4GH_MCP_HTTP_PATH`, `GA4GH_MCP_REGISTRY_BASE_URL`, timeouts, cache TTLs,
-`GA4GH_MCP_AUTH_CONFIG`, `GA4GH_MCP_BEARER_TOKEN`, `GA4GH_MCP_BEARER_HOSTS`. See `.env.example`.
+`GA4GH_MCP_AUTH_CONFIG`, `GA4GH_MCP_BEARER_TOKEN`, `GA4GH_MCP_BEARER_HOSTS`,
+`GA4GH_MCP_BLOCK_PRIVATE_ADDRESSES`. See `.env.example`.
+
+When served over `streamable-http`, outbound requests (and every redirect hop) to loopback,
+private, link-local (including the cloud metadata address 169.254.169.254) and other non-public
+addresses are refused. Set `GA4GH_MCP_BLOCK_PRIVATE_ADDRESSES=false` to reach services on a
+private network; set it to `true` to apply the same rule under stdio.
 
 ## Tool surface
 
