@@ -222,3 +222,49 @@ async def test_bound_provider_only_yields_headers_for_its_origin():
                 "https://evil.test/y", "https://sub.allowed.test/y"):
         assert await auth.headers_for(url) == {}, url
     await c.aclose()
+
+
+# ---------------------------------------------------------- DRS access capabilities
+
+DRS_BASE = "https://drs.test/ga4gh/drs/v1"
+SIGNED = {"url": "https://s3.test/obj?X-Amz-Signature=sig123&X-Amz-Credential=cred456",
+          "headers": {"Authorization": "Bearer storage-token-789"}}
+
+
+def _drs_ctx(ctx):
+    svc = {"id": "drs-sec", "implementationId": "drs-sec",
+           "serviceInfoUrl": f"{DRS_BASE}/service-info",
+           "standardVersion": {"ga4ghProduct": "DRS", "version": "1.2.0"}}
+    ctx.registry._cache.set("services", [svc])
+    return ctx
+
+
+@pytest.mark.parametrize("inline", [True, False])
+@respx.mock
+async def test_drs_access_url_capabilities_are_not_returned_to_the_model(ctx, inline):
+    # DRS AccessURL.headers and pre-signed query strings are bearer capabilities for the storage
+    # host. The Harness SDK redacts them; the registry-oriented tool returned them verbatim.
+    method = ({"type": "https", "access_url": SIGNED} if inline
+              else {"type": "s3", "access_id": "a1"})
+    respx.get(f"{DRS_BASE}/objects/o1").mock(return_value=httpx.Response(
+        200, json={"id": "o1", "access_methods": [method]}))
+    respx.get(f"{DRS_BASE}/objects/o1/access/a1").mock(
+        return_value=httpx.Response(200, json=SIGNED))
+    out = await tools.drs_get_access_url(_drs_ctx(ctx), service_id="drs-sec", object_id="o1")
+    blob = json.dumps(out)
+    assert out["ok"] is True
+    for secret in ("storage-token-789", "sig123", "cred456"):
+        assert secret not in blob
+    assert out["data"]["access_url"]["url"] == "https://s3.test/obj"
+    assert out["data"]["access_url"]["headers"] == {"redacted": True}
+
+
+@respx.mock
+async def test_drs_object_inline_access_url_capabilities_are_redacted(ctx):
+    respx.get(f"{DRS_BASE}/objects/o1").mock(return_value=httpx.Response(200, json={
+        "id": "o1", "access_methods": [{"type": "https", "access_url": SIGNED}]}))
+    out = await tools.drs_get_object(_drs_ctx(ctx), service_id="drs-sec", object_id="o1")
+    blob = json.dumps(out)
+    assert out["ok"] is True and out["data"]["id"] == "o1"
+    for secret in ("storage-token-789", "sig123", "cred456"):
+        assert secret not in blob
