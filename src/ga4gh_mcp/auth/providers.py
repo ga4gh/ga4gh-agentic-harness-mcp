@@ -163,14 +163,17 @@ class OAuth2DeviceCodeAuth:
     def _save(self) -> None:
         if not self._store:
             return
-        self._store.parent.mkdir(parents=True, exist_ok=True)
-        self._store.write_text(json.dumps(
-            {"access_token": self._token, "refresh_token": self._refresh,
-             "expires_at": self._expires_at}))
-        try:
-            self._store.chmod(0o600)
-        except OSError:
-            pass
+        # Create the directory and file private from the start (O_CREAT with 0600), rather than
+        # writing with the process umask and tightening afterwards.
+        self._store.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        payload = json.dumps({"access_token": self._token, "refresh_token": self._refresh,
+                              "expires_at": self._expires_at})
+        tmp = self._store.with_suffix(".tmp")
+        tmp.unlink(missing_ok=True)  # O_EXCL below: never reuse a pre-existing, looser file
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(payload)
+        os.replace(tmp, self._store)
 
     # ---- flow ----
     async def start(self) -> dict[str, Any]:
