@@ -89,6 +89,8 @@ def normalize_service_info(si: dict[str, Any], *, source: str) -> dict[str, Any]
             "version": t.get("version"),
         },
         "source": f"federated:{source}",
+        # How a pre-1.0 or pre-standard Beacon is queried, declared by its registry record.
+        **({"queryShape": si["queryShape"]} if isinstance(si.get("queryShape"), dict) else {}),
     }
 
 
