@@ -238,3 +238,28 @@ def test_cli_lists_harness_tools(capsys):
     assert '"profile": "ga4gh-agentic-harness"' in output
     assert '"ga4gh_harness_describe"' in output
     assert '"count": 13' in output
+
+
+@pytest.mark.parametrize("host", ["0.0.0.0", "::", "10.0.0.5", "mcp.example.org"])
+def test_write_scopes_refused_on_unauthenticated_network_bind(host: str):
+    # The streamable-HTTP transport has no inbound authorization, so every client that can reach
+    # the port inherits the server-wide write scopes. Binding off loopback with write scopes set
+    # would let any network client submit or cancel WES runs.
+    settings = load_settings(
+        transport="streamable-http", host=host, agentic_write_scopes="ga4gh:workflow:submit"
+    )
+    with pytest.raises(ValueError, match="write scopes"):
+        build_agentic_server(settings, harness=RecordingHarness())  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1"])
+def test_write_scopes_allowed_on_loopback_http_bind(host: str):
+    settings = load_settings(
+        transport="streamable-http", host=host, agentic_write_scopes="ga4gh:workflow:submit"
+    )
+    build_agentic_server(settings, harness=RecordingHarness())  # type: ignore[arg-type]
+
+
+def test_network_bind_without_write_scopes_still_builds():
+    settings = load_settings(transport="streamable-http", host="0.0.0.0")
+    build_agentic_server(settings, harness=RecordingHarness())  # type: ignore[arg-type]

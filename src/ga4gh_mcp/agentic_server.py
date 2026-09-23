@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -81,6 +82,35 @@ def _harness_settings(settings: Settings) -> HarnessSettings:
     )
 
 
+def _is_loopback_host(host: str) -> bool:
+    if host.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        return False
+
+
+def _check_write_scope_exposure(settings: Settings) -> None:
+    """Refuse write scopes when unauthenticated network clients would inherit them.
+
+    The streamable-HTTP transport has no inbound authorization, so the server-wide scopes in
+    ``agentic_write_scopes`` apply to every client that can reach the port. On loopback that is
+    the local user; on any other bind address it is the network.
+    """
+    if (
+        settings.transport == "streamable-http"
+        and settings.agentic_write_scope_list()
+        and not _is_loopback_host(settings.host)
+    ):
+        raise ValueError(
+            "agentic write scopes cannot be enabled on a non-loopback streamable-http bind "
+            f"({settings.host!r}): the transport has no inbound authorization, so every network "
+            "client would be able to submit or cancel WES runs. Bind to 127.0.0.1 or clear "
+            "GA4GH_MCP_AGENTIC_WRITE_SCOPES."
+        )
+
+
 def build_agentic_server(
     settings: Settings | None = None,
     *,
@@ -88,6 +118,7 @@ def build_agentic_server(
 ) -> FastMCP:
     """Build the canonical MCP tool surface over one SDK ``Harness`` instance."""
     settings = settings or load_settings()
+    _check_write_scope_exposure(settings)
     owns_harness = harness is None
     sdk = harness or Harness(settings=_harness_settings(settings))
     authority = AuthorityContext(

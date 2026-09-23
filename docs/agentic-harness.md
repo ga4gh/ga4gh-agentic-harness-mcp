@@ -65,6 +65,7 @@ WES submission and cancellation are denied by default. For a trusted local clien
 `GA4GH_MCP_AGENTIC_WRITE_SCOPES` may explicitly list `ga4gh:workflow:submit` and/or
 `ga4gh:workflow:cancel`. On the unauthenticated loopback HTTP transport those scopes apply to
 every connected local client, so do not enable them on a shared machine or network interface.
+The server refuses to start with write scopes on a non-loopback streamable-http bind.
 
 The profile schemas and SDK inputs are not yet identical: profile operations
 use complete service references, while SDK v0.1 currently selects registered
