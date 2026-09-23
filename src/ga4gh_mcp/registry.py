@@ -99,21 +99,31 @@ class RegistryClient:
         self._cache = _Cache(settings.registry_cache_ttl)
 
     async def _get_list(self, endpoint: str) -> list[dict[str, Any]]:
+        """Concatenate one endpoint across the configured Implementation Registries.
+
+        With none configured the list is empty. An unreachable one is skipped while another
+        answers; all of them failing is an error.
+        """
         cached = self._cache.get(endpoint)
         if cached is not None:
             return cached
-        url = self._settings.registry_base_url.rstrip("/") + "/" + endpoint
-        res = await self._http.get_json(url)
-        if res.liveness.value != "live" or not isinstance(res.json, list):
+        bases = self._settings.registry_urls("implementation-registry")
+        items: list[dict[str, Any]] = []
+        failures: list[str] = []
+        for base in bases:
+            res = await self._http.get_json(base + "/" + endpoint)
+            if res.liveness.value != "live" or not isinstance(res.json, list):
+                failures.append(f"{base}: {res.status or res.liveness.value}")
+                continue
+            items += res.json
+        if bases and len(failures) == len(bases):
             raise ToolError(
                 ErrorType.UPSTREAM,
-                f"registry endpoint /{endpoint} unavailable "
-                f"({res.status or res.liveness.value})",
-                detail=res.error,
+                f"registry endpoint /{endpoint} unavailable ({'; '.join(failures)})",
                 hint="The GA4GH Implementation Registry may be down; retry shortly.",
             )
-        self._cache.set(endpoint, res.json)
-        return res.json
+        self._cache.set(endpoint, items)
+        return items
 
     async def services(self) -> list[dict[str, Any]]:
         return await self._get_list("services")
@@ -128,12 +138,13 @@ class RegistryClient:
         return await self._get_list("standards")
 
     async def federated(self) -> list[dict[str, Any]]:
-        """Best-effort fetch + normalize of services from extra GA4GH Service Registries.
+        """Best-effort fetch + normalize of services from the configured Service Registries.
 
-        A failing or offline federated registry is skipped (never crashes a listing).
+        A failing or offline Service Registry is skipped (never crashes a listing).
         """
         out: list[dict[str, Any]] = []
-        for url in self._settings.extra_registry_urls():
+        for base in self._settings.registry_urls("service-registry"):
+            url = base + "/services"
             cached = self._cache.get(f"fed:{url}")
             if cached is None:
                 res = await self._http.get_json(url)
@@ -152,8 +163,8 @@ class RegistryClient:
             if include_deployments:
                 items += await self.deployments()
         except ToolError:
-            # A down core registry must not hide federated services (and vice-versa).
-            if not self._settings.extra_registry_urls():
+            # A down Implementation Registry must not hide Service Registry services.
+            if not self._settings.registry_urls("service-registry"):
                 raise
         items += await self.federated()
         return items
@@ -218,11 +229,10 @@ class RegistryClient:
                 return s
         # Fallback: direct UUID lookup (implementationId is unsupported by the API).
         if "-" in service_id and len(service_id) >= 32:
-            url = (self._settings.registry_base_url.rstrip("/") + "/services/"
-                   + quote(service_id, safe=""))
-            res = await self._http.get_json(url)
-            if res.liveness.value == "live" and isinstance(res.json, dict):
-                return res.json
+            for base in self._settings.registry_urls("implementation-registry"):
+                res = await self._http.get_json(base + "/services/" + quote(service_id, safe=""))
+                if res.liveness.value == "live" and isinstance(res.json, dict):
+                    return res.json
         raise ToolError(
             ErrorType.NOT_FOUND,
             f"no registered service with id or implementationId '{service_id}'",

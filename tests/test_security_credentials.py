@@ -91,7 +91,10 @@ async def test_federated_entry_cannot_claim_a_configured_implementation_id(tmp_p
     the configured id 'org.test.drs' must not receive that service's token."""
     monkeypatch.setenv("TOK", "s3cret")
     settings = load_settings(
-        registry_base_url="https://registry.test/api", extra_registries=FED,
+        registries=[
+            {"url": "https://registry.test/api", "api": "implementation-registry"},
+            {"url": FED.removesuffix("/services"), "api": "service-registry"},
+        ],
         max_retries=0, retry_backoff=0.0,
         auth_config=_cfg(tmp_path, {"org.test.drs": {"kind": "bearer", "token_env": "TOK"}}))
     respx.get("https://registry.test/api/services").mock(return_value=httpx.Response(503))

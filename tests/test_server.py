@@ -29,7 +29,7 @@ async def test_call_tool_through_sdk(registry_data):
         return_value=httpx.Response(200, json=registry_data["deployments"]))
     respx.get("https://registry.test/api/standards").mock(
         return_value=httpx.Response(200, json=registry_data["standards"]))
-    settings = load_settings(registry_base_url="https://registry.test/api")
+    settings = load_settings(registries=[{"url": "https://registry.test/api", "api": "implementation-registry"}])
     ctx = ServerContext.create(settings)
     mcp = build_server(settings, ctx=ctx)
     # FastMCP.call_tool returns (content, structured_result)

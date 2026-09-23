@@ -50,8 +50,31 @@ ga4gh-mcp --transport streamable-http \
 
 All options are also env vars (prefix `GA4GH_MCP_`):
 `GA4GH_MCP_TRANSPORT`, `GA4GH_MCP_HOST`,
-`GA4GH_MCP_PORT`, `GA4GH_MCP_HTTP_PATH`, `GA4GH_MCP_REGISTRY_BASE_URL`, timeouts, cache TTLs,
+`GA4GH_MCP_PORT`, `GA4GH_MCP_HTTP_PATH`, `GA4GH_MCP_REGISTRIES`, timeouts, cache TTLs,
 `GA4GH_MCP_AUTH_CONFIG`, `GA4GH_MCP_BEARER_TOKEN`, `GA4GH_MCP_BEARER_HOSTS`. See `.env.example`.
+
+### Registries
+
+Services are discovered from one list of registries. Each entry is a URL and the API it speaks,
+declared rather than probed: `implementation-registry` (the GA4GH Implementation Registry, which
+also supplies standards, organisations and deployments) or `service-registry` (any GA4GH Service
+Registry `/services` endpoint, such as a local WES or `ga4gh-aws-opendata`). The default is the
+GA4GH Implementation Registry alone. Setting the list replaces it:
+
+```bash
+GA4GH_MCP_REGISTRIES='[
+  {"url": "https://implementation-registry.ga4gh.org/api", "api": "implementation-registry"},
+  {"url": "http://127.0.0.1:18090/ga4gh/registry", "api": "service-registry"}
+]' ga4gh-mcp --agentic-allow-private-hosts
+
+# or on the command line (repeatable)
+ga4gh-mcp --registry implementation-registry=https://implementation-registry.ga4gh.org/api \
+  --registry service-registry=http://127.0.0.1:18090/ga4gh/registry
+```
+
+An unreachable registry is skipped while another answers. The same list reaches the Harness SDK.
+Plain HTTP to this machine (`localhost`, `127.0.0.1`, `::1`) needs only
+`--agentic-allow-private-hosts`; every other host still requires HTTPS.
 
 ## Tools
 

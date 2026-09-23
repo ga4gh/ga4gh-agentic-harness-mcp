@@ -28,7 +28,7 @@ def registry_data() -> dict[str, list[dict[str, Any]]]:
 def settings():
     # Fast + deterministic for tests.
     return load_settings(
-        registry_base_url=REGISTRY_BASE,
+        registries=[{"url": REGISTRY_BASE, "api": "implementation-registry"}],
         max_retries=1,
         retry_backoff=0.0,
         connect_timeout=2.0,
