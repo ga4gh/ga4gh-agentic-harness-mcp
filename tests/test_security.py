@@ -44,10 +44,10 @@ async def test_custom_auth_header_not_forwarded_on_cross_origin_redirect():
     sink = respx.get("https://attacker.test/collect").mock(
         return_value=httpx.Response(200, json={}))
     c = _client()
-    res = await c.request("GET", "https://svc.test/objects/1", headers={"X-API-Key": "s3cret"})
+    await c.request("GET", "https://svc.test/objects/1", headers={"X-API-Key": "s3cret"})
     await c.aclose()
-    assert not sink.called
-    assert res.liveness == Liveness.BLOCKED
+    assert sink.called  # followed, as for signed-storage hand-offs, but without credentials
+    assert "x-api-key" not in sink.calls.last.request.headers
 
 
 @respx.mock
@@ -278,7 +278,7 @@ async def test_drs_object_inline_access_url_capabilities_are_redacted(ctx):
 
 # ------------------------------------------------ registry-oriented tool annotations + gate
 
-_LEGACY_WRITERS = {"call_service_endpoint", "auth_device_login"}
+_LEGACY_WRITERS = {"auth_device_login"}
 
 
 async def test_registry_tools_declare_annotations():
@@ -289,7 +289,8 @@ async def test_registry_tools_declare_annotations():
     for name, ann in listed.items():
         assert ann is not None, name
         assert ann.readOnlyHint is (name not in _LEGACY_WRITERS), name
-    assert listed["call_service_endpoint"].destructiveHint is True
+    # GET-only unless GA4GH_MCP_ALLOW_WRITE_METHODS is set (see test_security_annotations.py).
+    assert listed["call_service_endpoint"].readOnlyHint is True
     assert listed["call_service_endpoint"].openWorldHint is True
     assert listed["auth_status"].openWorldHint is False
 
@@ -368,3 +369,15 @@ async def test_registry_uuid_fallback_does_not_let_service_id_rewrite_the_path(c
         ctx, service_id="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/../../../admin")
     assert not escape.called
     assert out["ok"] is False
+
+
+def test_legacy_write_methods_refused_on_non_loopback_http_bind():
+    with pytest.raises(ValueError, match="non-loopback"):
+        build_server(load_settings(transport="streamable-http", host="0.0.0.0",
+                                   allow_write_methods=True))
+
+
+def test_legacy_write_methods_allowed_on_loopback_http_bind():
+    c = ServerContext.create(load_settings())
+    build_server(load_settings(transport="streamable-http", host="127.0.0.1",
+                               allow_write_methods=True), ctx=c)

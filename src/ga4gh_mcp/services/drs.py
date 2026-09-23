@@ -19,6 +19,18 @@ register(ServiceTypePlugin(
 ))
 _PLUGIN = get_plugin("DRS")
 
+# Guidance returned on a 404 so a caller (e.g. an LLM) does not fall into a guess-the-id loop.
+# DRS is resolve-by-exact-id only; ids are discovered elsewhere, never enumerated or invented.
+DRS_NOT_FOUND_HINT = (
+    "DRS resolves objects by exact id and has no list or search endpoint, so ids cannot be "
+    "enumerated or guessed. This id is unknown to the service, so do NOT retry with other "
+    "guessed ids. Get the exact id from: (1) a Data Connect catalog on a companion service "
+    "(data_connect_list_tables / data_connect_search, looking for drs_id / drs_uri / path "
+    "columns); (2) a drs:// URI you were given; or (3) the data source's published layout. "
+    "For fully public open data (e.g. AWS Open Data), the access URL is often just the "
+    "source's public HTTPS URL from its registry/downloads page, so DRS may not be needed."
+)
+
 
 def redact_access_url(access_url: Any) -> Any:
     """Strip bearer capabilities from a DRS AccessURL before it reaches the model.
@@ -71,6 +83,11 @@ async def get_access_url(http: Ga4ghHttpClient, service: dict[str, Any], auth: O
     if access_id is None:
         obj = await get_object(http, service, auth, object_id)
         if not isinstance(obj.json, dict):
+            if obj.status == 404:
+                raise ToolError(ErrorType.NOT_FOUND,
+                                f"no DRS object with id '{object_id}'",
+                                detail={"object_id": object_id, "http_status": 404},
+                                hint=DRS_NOT_FOUND_HINT)
             raise ToolError(ErrorType.UPSTREAM,
                             f"could not fetch DRS object ({obj.status or obj.liveness.value})",
                             detail=obj.error)

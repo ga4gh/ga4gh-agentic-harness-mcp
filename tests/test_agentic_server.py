@@ -279,3 +279,9 @@ async def test_annotations_reflect_remote_calls_and_side_effects():
         assert tools[name].destructiveHint is True
     assert tools["ga4gh_wes_run_submit"].idempotentHint is False
     assert tools["ga4gh_wes_run_cancel"].idempotentHint is True
+
+
+def test_cli_lists_legacy_surface(capsys):
+    assert main(["--surface", "legacy", "--list-tools"]) == 0
+    output = capsys.readouterr().out
+    assert '"surface": "legacy"' in output and "data_connect_search" in output

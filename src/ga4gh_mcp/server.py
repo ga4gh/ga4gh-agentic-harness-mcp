@@ -13,6 +13,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from . import tools
+from .agentic_server import _is_loopback_host
 from .config import Settings, load_settings
 from .context import ServerContext
 
@@ -21,7 +22,8 @@ _READ = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint
                         openWorldHint=True)
 _LOCAL_READ = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True,
                               openWorldHint=False)
-# call_service_endpoint can POST/PUT/PATCH/DELETE (when allow_write_methods is set).
+# call_service_endpoint can POST/PUT/PATCH/DELETE only when allow_write_methods is set;
+# otherwise it is GET-only and annotated _READ.
 _GENERIC = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False,
                            openWorldHint=True)
 # auth_device_login starts an OAuth grant and writes a token cache file.
@@ -36,14 +38,44 @@ generic (service-info driven) plus type-aware access to registered services.
 Registered implementations vary in liveness, spec compliance, and version. Every tool returns
 a structured envelope: {"ok": bool, "data"|"error", "warnings": [...]}. Start with
 list_services / search_services to find a service id, then get_service / check_service_health /
-get_service_info, then type-aware tools (drs_*, trs_*, tes_*, beacon_info) or the generic
-call_service_endpoint. Auth is discovered per service; see auth_status.
+get_service_info, then type-aware tools (drs_*, data_connect_*, trs_*, tes_*, beacon_info) or
+the generic call_service_endpoint. Auth is discovered per service; see auth_status.
+
+Discovery vs. access — two distinct layers that work together; do not confuse them:
+- Data Connect (data_connect_*) is the DISCOVERY / catalog layer. Query its tables to learn what
+  a service holds and to obtain identifiers (DRS ids, drs:// URIs, or file paths / URLs).
+- DRS (drs_*) is the ACCESS layer. It resolves ONE object by its EXACT id to metadata and an
+  access URL. DRS has no list or search endpoint: you cannot browse or enumerate objects, and
+  ids must never be guessed or constructed by pattern. If drs_get_object returns not_found, the
+  id is wrong — get the real id from a Data Connect catalog, a drs:// URI, or the source's
+  published layout, and do not retry with more guesses.
+- Public open data: if the target is fully public (e.g. AWS Open Data), its access URL is often
+  just the source's published HTTPS URL. Resolve that directly instead of forcing it through DRS.
 """
+
+
+def _check_write_method_exposure(settings: Settings) -> None:
+    """Refuse state-changing HTTP methods when unauthenticated network clients would get them.
+
+    streamable-http has no inbound authorization, so allow_write_methods would let anyone who
+    can reach a non-loopback bind submit or cancel TES/WES jobs with the configured credentials.
+    """
+    if (
+        settings.transport == "streamable-http"
+        and settings.allow_write_methods
+        and not _is_loopback_host(settings.host)
+    ):
+        raise ValueError(
+            "GA4GH_MCP_ALLOW_WRITE_METHODS cannot be enabled on a non-loopback streamable-http "
+            f"bind ({settings.host!r}): the transport has no inbound authorization. Bind to "
+            "127.0.0.1 or leave write methods off."
+        )
 
 
 def build_server(settings: Settings | None = None,
                  ctx: ServerContext | None = None) -> FastMCP:
     settings = settings or load_settings()
+    _check_write_method_exposure(settings)
     context = ctx or ServerContext.create(settings)
 
     @asynccontextmanager
@@ -133,7 +165,7 @@ def build_server(settings: Settings | None = None,
         Returns a shape-tolerant analysis with version reconciliation and compliance warnings."""
         return await tools.get_service_info(context, service_id=service_id, url=url)
 
-    @mcp.tool(annotations=_GENERIC)
+    @mcp.tool(annotations=_GENERIC if settings.allow_write_methods else _READ)
     async def call_service_endpoint(service_id: str, path: str, method: str = "GET",
                                     query: dict[str, Any] | None = None,
                                     json_body: Any = None) -> dict[str, Any]:
@@ -148,13 +180,24 @@ def build_server(settings: Settings | None = None,
     # -------------------------------------------------------------- type-aware helpers
     @mcp.tool(annotations=_READ)
     async def drs_get_object(service_id: str, object_id: str) -> dict[str, Any]:
-        """DRS: fetch a data object's metadata (bundles, checksums, access methods)."""
+        """DRS: fetch a data object's metadata (bundles, checksums, access methods) by EXACT id.
+
+        DRS resolves one known object; it has no list/search, so ids cannot be enumerated or
+        guessed. Obtain object_id from a Data Connect catalog (data_connect_*), a drs:// URI, or
+        the data source's published layout. A not_found result means the id is wrong — do not
+        retry with guessed ids.
+        """
         return await tools.drs_get_object(context, service_id=service_id, object_id=object_id)
 
     @mcp.tool(annotations=_READ)
     async def drs_get_access_url(service_id: str, object_id: str,
                                  access_id: str | None = None) -> dict[str, Any]:
-        """DRS: resolve a concrete access URL for a data object (dereferences access_id if needed)."""
+        """DRS: resolve a concrete access URL for a data object (dereferences access_id if needed).
+
+        Needs the EXACT object_id (see drs_get_object; ids are not guessable). For fully public
+        open data the access URL is often just the source's public HTTPS URL — you may not need
+        DRS at all.
+        """
         return await tools.drs_get_access_url(
             context, service_id=service_id, object_id=object_id, access_id=access_id)
 
@@ -185,17 +228,25 @@ def build_server(settings: Settings | None = None,
 
     @mcp.tool(annotations=_READ)
     async def data_connect_list_tables(service_id: str) -> dict[str, Any]:
-        """Data Connect: list the tables a service exposes (e.g. AWS Open Data variant tables)."""
+        """Data Connect: list the tables a service exposes — the catalog / discovery layer.
+
+        Use this to learn what a service holds and to find identifiers (DRS ids, drs:// URIs,
+        file paths) you can then access via drs_* or a direct URL."""
         return await tools.data_connect_list_tables(context, service_id=service_id)
 
     @mcp.tool(annotations=_READ)
     async def data_connect_table_info(service_id: str, table: str) -> dict[str, Any]:
-        """Data Connect: get a table's JSON-Schema data model (columns + types)."""
+        """Data Connect: get a table's JSON-Schema data model (columns + types).
+
+        Inspect columns here to find id/uri/path fields that link out to DRS or downloadable files."""
         return await tools.data_connect_table_info(context, service_id=service_id, table=table)
 
     @mcp.tool(annotations=_READ)
     async def data_connect_search(service_id: str, sql: str) -> dict[str, Any]:
         """Data Connect: run a read-only SQL query against a service's tables and return rows.
+
+        This is the discovery layer: use it to locate records and pull identifiers (e.g. drs_id /
+        drs_uri / file paths) for downstream access via drs_* or a direct URL.
         Example: SELECT gene, oe_lof_upper AS loeuf FROM gnomad.gene_constraint WHERE gene='BRCA1'."""
         return await tools.data_connect_search(context, service_id=service_id, sql=sql)
 

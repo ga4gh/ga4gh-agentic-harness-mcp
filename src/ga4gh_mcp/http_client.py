@@ -154,8 +154,9 @@ class Ga4ghHttpClient:
         Every URL, including each redirect target, must pass :meth:`_check_destination`
         (http/https only, no userinfo, no loopback/private/link-local/reserved addresses unless
         ``agentic_allow_private_hosts`` is set). Caller-supplied ``headers`` carry credentials, so
-        a redirect that changes origin (scheme, host, or port) is refused rather than followed:
-        httpx would strip only ``Authorization`` and forward custom headers such as X-API-Key.
+        they are dropped when a redirect changes origin (scheme, host, or port): httpx would strip
+        only ``Authorization`` and forward custom headers such as X-API-Key. A cross-origin
+        redirect that would re-send a request body is refused.
         """
         current = url
         for _hop in range(_MAX_REDIRECTS + 1):
@@ -170,12 +171,17 @@ class Ga4ghHttpClient:
             if not location:
                 return res
             nxt = urljoin(current, location)
-            if headers and _origin(nxt) != _origin(current):
-                return HttpResult(url=current, liveness=Liveness.BLOCKED, status=res.status,
-                                  error="blocked: cross-origin redirect of a credentialed "
-                                        f"request to {_origin(nxt)[1]}")
             if res.status == 303 or (res.status in (301, 302) and method.upper() == "POST"):
                 method, json_body, data = "GET", None, None
+            if _origin(nxt) != _origin(current):
+                if json_body is not None or data is not None:
+                    # A 307/308 re-sends the body, which can carry secrets (client_secret forms).
+                    return HttpResult(url=current, liveness=Liveness.BLOCKED, status=res.status,
+                                      error="blocked: cross-origin redirect would re-send the "
+                                            f"request body to {_origin(nxt)[1]}")
+                # Credentials never leave their origin; the redirect itself is still followed,
+                # e.g. a DRS or htsget server handing off to signed cloud storage.
+                headers = None
             current, params = nxt, None
         return HttpResult(url=current, liveness=Liveness.BLOCKED,
                           error="blocked: redirect limit exceeded")

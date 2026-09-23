@@ -284,7 +284,7 @@ requires-dist = [
 provides-extras = ["dev"]
 
 [[package]]
-name = "ga4gh-mcp-service"
+name = "ga4gh-agentic-harness-mcp"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
