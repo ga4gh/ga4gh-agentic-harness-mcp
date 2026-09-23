@@ -7,7 +7,8 @@ import os
 import re
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+
+import httpx
 
 from ..config import Settings
 from ..http_client import Ga4ghHttpClient
@@ -18,13 +19,29 @@ from .providers import NoAuth, StaticBearerAuth, build_provider
 _TOKEN_STORE_DIR = os.path.expanduser("~/.ga4gh-mcp/tokens")
 
 
-def _host(url: str | None) -> str | None:
+_LOOPBACK = {"localhost", "127.0.0.1", "::1"}
+
+Origin = tuple[str, str, int | None]
+
+
+def _origin(url: str | None) -> Origin | None:
+    """(scheme, host, port) parsed with httpx, i.e. exactly where a request will be sent."""
     if not url:
         return None
     try:
-        return (urlparse(url).hostname or "").lower() or None
+        u = httpx.URL(url)
     except Exception:  # noqa: BLE001
         return None
+    host = u.host.lower().rstrip(".")
+    if not host:
+        return None
+    return u.scheme, host, u.port or {"https": 443, "http": 80}.get(u.scheme)
+
+
+def _may_carry_credentials(origin: Origin) -> bool:
+    """Credentials travel only over TLS (plain http is tolerated for loopback dev servers)."""
+    scheme, host, _ = origin
+    return scheme == "https" or (scheme == "http" and host in _LOOPBACK)
 
 
 # WWW-Authenticate token = token68 or key="quoted" / key=token pairs.
@@ -64,8 +81,14 @@ class AuthResolver:
     """Maps a registry service entry to an :class:`AuthProvider`.
 
     Resolution order: explicit config match (by implementationId, then host) → global
-    static bearer (only for allow-listed hosts) → NoAuth. Providers are cached so OAuth
-    token caches survive across calls.
+    static bearer (only for allow-listed hosts) → NoAuth. Providers are cached per
+    (implementationId, origin) so OAuth token caches survive across calls, and a decision made
+    for one origin is never reused for another.
+
+    Credentials are bound to where they were configured, not to what a registry entry claims:
+    nothing is attached over plain http (except loopback); a spec's ``hosts`` list, when set,
+    restricts it to those hosts; and an entry from a federated registry (which mints its own
+    ids) cannot match a spec by implementationId unless that spec pins ``hosts``.
     """
 
     def __init__(self, settings: Settings, http: Ga4ghHttpClient) -> None:
@@ -93,24 +116,34 @@ class AuthResolver:
             specs = [AuthSpec.from_dict(s) for s in raw]
         return specs
 
-    def _find_spec(self, impl_id: str | None, host: str | None) -> AuthSpec | None:
+    def _find_spec(self, impl_id: str | None, host: str, *, federated: bool) -> AuthSpec | None:
+        def pinned_ok(s: AuthSpec) -> bool:
+            return not s.hosts or host in {h.strip().lower() for h in s.hosts}
+
         for s in self._specs:
-            if s.match and impl_id and s.match == impl_id:
+            if s.match and impl_id and s.match == impl_id and pinned_ok(s):
+                if federated and not s.hosts:
+                    continue
                 return s
         for s in self._specs:
-            if s.match and host and s.match.lower() == host:
+            if s.match and s.match.lower() == host and pinned_ok(s):
                 return s
         return None
 
     def resolve(self, service: dict[str, Any]) -> AuthProvider:
         impl_id = service.get("implementationId")
-        host = _host(service.get("serviceInfoUrl") or service.get("url"))
-        key = impl_id or host or "default"
+        origin = _origin(service.get("serviceInfoUrl") or service.get("url"))
+        key = (impl_id, origin)
         if key in self._cache:
             return self._cache[key]
 
-        spec = self._find_spec(impl_id, host)
-        if spec is not None:
+        secure = origin is not None and _may_carry_credentials(origin)
+        host = origin[1] if origin else ""
+        federated = str(service.get("source") or "").startswith("federated:")
+        spec = self._find_spec(impl_id, host, federated=federated) if secure else None
+        if not secure:
+            provider = NoAuth()
+        elif spec is not None:
             provider = build_provider(spec, self._http, token_store_dir=_TOKEN_STORE_DIR)
         elif self._settings.bearer_token and host in self._settings.bearer_host_set():
             provider = StaticBearerAuth(self._settings.bearer_token)
@@ -122,7 +155,7 @@ class AuthResolver:
     def describe(self) -> dict[str, Any]:
         return {
             "configured_specs": [
-                {"match": s.match, "kind": s.kind} for s in self._specs
+                {"match": s.match, "kind": s.kind, "hosts": s.hosts} for s in self._specs
             ],
             "global_bearer_configured": bool(self._settings.bearer_token),
             "global_bearer_hosts": sorted(self._settings.bearer_host_set()),

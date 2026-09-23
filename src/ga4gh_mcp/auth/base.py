@@ -30,6 +30,9 @@ class AuthSpec:
 
     kind: str = "none"  # none | bearer | api_key | oauth2_client_credentials | oauth2_device_code
     match: str | None = None  # implementationId or host this spec applies to
+    # Hosts this credential may be sent to. When set, a match (by implementationId or host)
+    # only applies if the service's URL is on one of these hosts.
+    hosts: list[str] | None = None
     # bearer / api_key
     token_env: str | None = None
     header: str | None = None  # api_key header name (default "Authorization")

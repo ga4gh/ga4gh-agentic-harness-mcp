@@ -32,6 +32,17 @@ For each outbound call, `AuthResolver.resolve(service)` picks:
    so a token is never leaked to an unintended host.
 3. Otherwise **`none`**.
 
+Credentials are bound to where they were configured, not to what a registry entry says:
+
+- Nothing is attached over plain `http://` (loopback hosts excepted, for local development).
+- A spec may carry `"hosts": ["drs.example.org"]`. When set, the spec applies only if the
+  service URL is on one of those hosts, whichever way it matched. Pin `hosts` on every
+  `implementationId`-matched spec: the id is registry data, the host is where the token goes.
+- An entry from a federated registry (`GA4GH_MCP_EXTRA_REGISTRIES`) cannot match a spec by
+  `implementationId` unless that spec pins `hosts`, because a federated registry mints its own ids.
+- Redirects keep credentials only while they stay on the same scheme, host and port; a redirect
+  that would re-send a request body (for example a token request) to another origin is refused.
+
 On a `401`/`403`, the server parses the `WWW-Authenticate` header into an **auth hint**
 (`scheme`, `realm`, `scope`, `authorization_uri`, guidance) and returns it in the error envelope,
 telling the model exactly what to configure.
@@ -44,7 +55,8 @@ Set `GA4GH_MCP_AUTH_CONFIG=/path/to/auth.json`. Two accepted shapes:
 // map form — key is the match (implementationId or host)
 {
   "services": {
-    "com.sb.cgc.drs": { "kind": "bearer", "token_env": "CGC_TOKEN" },
+    "com.sb.cgc.drs": { "kind": "bearer", "token_env": "CGC_TOKEN",
+                        "hosts": ["cgc-ga4gh-api.sbgenomics.com"] },
     "data.terra.bio": {
       "kind": "oauth2_device_code",
       "device_authorization_url": "https://accounts.google.com/o/oauth2/device/code",
