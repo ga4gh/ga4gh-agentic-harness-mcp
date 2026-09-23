@@ -46,7 +46,8 @@ class Settings(BaseSettings):
     verify_tls: bool = True
     user_agent: str = "ga4gh-agentic-harness-mcp/0.1 (+https://github.com/mfiume/ga4gh-agentic-harness-mcp)"
     max_response_bytes: int = 2_000_000  # cap on any single upstream body we buffer
-    # Agentic SDK exceptions for explicit local development. Disabled by default.
+    # Exceptions for explicit local development. Disabled by default. allow_private_hosts also
+    # governs the registry-oriented client in http_client.py (loopback/private/metadata targets).
     agentic_allow_http: bool = False
     agentic_allow_private_hosts: bool = False
     agentic_allowed_hosts: str = ""

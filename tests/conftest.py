@@ -55,3 +55,22 @@ def find_service(registry_data, product: str) -> dict[str, Any]:
         if (s.get("standardVersion") or {}).get("ga4ghProduct") == product and s.get("serviceInfoUrl"):
             return s
     raise AssertionError(f"no fixture service for {product}")
+
+
+@pytest.fixture(autouse=True)
+def _public_dns(monkeypatch, request):
+    """Resolve every non-literal hostname to a public address so unit tests never hit DNS.
+
+    The outbound-destination check in ``http_client`` resolves hostnames before connecting;
+    tests that exercise that check patch ``_resolve_addresses`` themselves. Live tests keep
+    real resolution.
+    """
+    if request.node.get_closest_marker("live") or "test_live_integration" in request.node.nodeid:
+        return
+    from ga4gh_mcp import http_client
+
+    async def _fake(host, port):
+        return ["93.184.216.34"]
+
+    if hasattr(http_client, "_resolve_addresses"):
+        monkeypatch.setattr(http_client, "_resolve_addresses", _fake)

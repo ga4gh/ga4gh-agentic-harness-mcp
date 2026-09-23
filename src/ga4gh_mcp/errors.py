@@ -23,6 +23,7 @@ class Liveness(str, Enum):
     TLS_ERROR = "tls_error"  # TLS handshake failed
     CONNECTION_ERROR = "connection_error"  # refused / reset / other transport error
     NO_SERVICE_INFO_URL = "no_service_info_url"  # registry entry has no serviceInfoUrl
+    BLOCKED = "blocked"  # refused before sending: unsafe destination or credentialed redirect
 
 
 # Liveness values that mean "the host answered us" (useful for filtering/among "up").

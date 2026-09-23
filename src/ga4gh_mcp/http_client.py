@@ -8,11 +8,13 @@ pages) become *structured* outcomes instead of exceptions that could crash a too
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import socket
 import ssl
 import time
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 
@@ -21,6 +23,35 @@ from .errors import Liveness
 
 # HTTP statuses worth retrying (transient).
 _RETRY_STATUS = {429, 500, 502, 503, 504}
+_REDIRECT_STATUS = {301, 302, 303, 307, 308}
+_MAX_REDIRECTS = 5
+
+
+class UnsafeDestination(ValueError):
+    """An outbound URL was refused before any bytes were sent."""
+
+
+def _origin(url: str) -> tuple[str, str, int | None]:
+    parts = urlsplit(url)
+    port = parts.port or {"http": 80, "https": 443}.get(parts.scheme.lower())
+    return parts.scheme.lower(), (parts.hostname or "").lower(), port
+
+
+def _is_public_ip(value: str) -> bool:
+    ip = ipaddress.ip_address(value)
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast
+                or ip.is_reserved or ip.is_unspecified)
+
+
+async def _resolve_addresses(host: str, port: int) -> list[str]:
+    """Resolve ``host`` to IP strings; an empty list lets the transport report the DNS failure."""
+    try:
+        infos = await asyncio.to_thread(socket.getaddrinfo, host, port)
+    except (socket.gaierror, UnicodeError):
+        return []
+    return [str(info[4][0]) for info in infos]
 
 
 @dataclass
@@ -93,7 +124,8 @@ class Ga4ghHttpClient:
             self._client = httpx.AsyncClient(
                 timeout=timeout,
                 verify=self._settings.verify_tls,
-                follow_redirects=True,
+                # Redirects are followed in ``request`` so every hop is checked (see below).
+                follow_redirects=False,
                 headers={
                     "User-Agent": self._settings.user_agent,
                     "Accept": "application/json",
@@ -116,6 +148,69 @@ class Ga4ghHttpClient:
         params: dict[str, Any] | None = None,
         json_body: Any = None,
         data: dict[str, Any] | None = None,
+    ) -> HttpResult:
+        """Send one request, following redirects hop by hop.
+
+        Every URL, including each redirect target, must pass :meth:`_check_destination`
+        (http/https only, no userinfo, no loopback/private/link-local/reserved addresses unless
+        ``agentic_allow_private_hosts`` is set). Caller-supplied ``headers`` carry credentials, so
+        a redirect that changes origin (scheme, host, or port) is refused rather than followed:
+        httpx would strip only ``Authorization`` and forward custom headers such as X-API-Key.
+        """
+        current = url
+        for _hop in range(_MAX_REDIRECTS + 1):
+            try:
+                await self._check_destination(current)
+            except UnsafeDestination as exc:
+                return HttpResult(url=current, liveness=Liveness.BLOCKED,
+                                  error=f"blocked: {exc}")
+            res = await self._send(method, current, headers=headers, params=params,
+                                   json_body=json_body, data=data)
+            location = res.headers.get("location") if res.status in _REDIRECT_STATUS else None
+            if not location:
+                return res
+            nxt = urljoin(current, location)
+            if headers and _origin(nxt) != _origin(current):
+                return HttpResult(url=current, liveness=Liveness.BLOCKED, status=res.status,
+                                  error="blocked: cross-origin redirect of a credentialed "
+                                        f"request to {_origin(nxt)[1]}")
+            if res.status == 303 or (res.status in (301, 302) and method.upper() == "POST"):
+                method, json_body, data = "GET", None, None
+            current, params = nxt, None
+        return HttpResult(url=current, liveness=Liveness.BLOCKED,
+                          error="blocked: redirect limit exceeded")
+
+    async def _check_destination(self, url: str) -> None:
+        parts = urlsplit(url)
+        if parts.scheme.lower() not in ("http", "https"):
+            raise UnsafeDestination(f"scheme {parts.scheme!r} is not permitted")
+        if parts.username is not None or parts.password is not None:
+            raise UnsafeDestination("credentials embedded in the URL are not permitted")
+        host = (parts.hostname or "").lower()
+        if not host:
+            raise UnsafeDestination("URL has no host")
+        if self._settings.agentic_allow_private_hosts:
+            return
+        if host == "localhost" or host.endswith(".localhost"):
+            raise UnsafeDestination("loopback targets are not permitted")
+        try:
+            addresses = [str(ipaddress.ip_address(host))]
+        except ValueError:
+            addresses = await _resolve_addresses(host, parts.port or 443)
+        for addr in addresses:
+            if not _is_public_ip(addr.split("%", 1)[0]):
+                raise UnsafeDestination(
+                    f"{host} resolves to a loopback, private, link-local or reserved address")
+
+    async def _send(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str] | None,
+        params: dict[str, Any] | None,
+        json_body: Any,
+        data: dict[str, Any] | None,
     ) -> HttpResult:
         client = self._ensure()
         attempts = self._settings.max_retries + 1
