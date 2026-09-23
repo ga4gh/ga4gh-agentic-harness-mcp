@@ -357,3 +357,14 @@ def test_token_cache_paths_do_not_collide(tmp_path):
                            http, token_store_dir=str(tmp_path))
         paths.add(p.describe()["token_store"])
     assert len(paths) == 3
+
+
+@respx.mock
+async def test_registry_uuid_fallback_does_not_let_service_id_rewrite_the_path(ctx):
+    escape = respx.get("https://registry.test/admin").mock(
+        return_value=httpx.Response(200, json={"internal": True}))
+    respx.route(host="registry.test").mock(return_value=httpx.Response(404))
+    out = await tools.get_service(
+        ctx, service_id="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/../../../admin")
+    assert not escape.called
+    assert out["ok"] is False

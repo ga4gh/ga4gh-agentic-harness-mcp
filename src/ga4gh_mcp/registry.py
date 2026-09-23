@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import time
 from typing import Any
+from urllib.parse import quote
 
 from .config import Settings
 from .errors import ErrorType, ToolError
@@ -217,7 +218,8 @@ class RegistryClient:
                 return s
         # Fallback: direct UUID lookup (implementationId is unsupported by the API).
         if "-" in service_id and len(service_id) >= 32:
-            url = self._settings.registry_base_url.rstrip("/") + "/services/" + service_id
+            url = (self._settings.registry_base_url.rstrip("/") + "/services/"
+                   + quote(service_id, safe=""))
             res = await self._http.get_json(url)
             if res.liveness.value == "live" and isinstance(res.json, dict):
                 return res.json
