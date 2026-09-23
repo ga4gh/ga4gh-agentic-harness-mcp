@@ -263,3 +263,19 @@ def test_write_scopes_allowed_on_loopback_http_bind(host: str):
 def test_network_bind_without_write_scopes_still_builds():
     settings = load_settings(transport="streamable-http", host="0.0.0.0")
     build_agentic_server(settings, harness=RecordingHarness())  # type: ignore[arg-type]
+
+
+async def test_annotations_reflect_remote_calls_and_side_effects():
+    mcp = build_agentic_server(load_settings(), harness=RecordingHarness())  # type: ignore[arg-type]
+    tools = {tool.name: tool.annotations for tool in await mcp.list_tools()}
+
+    # Only harness_describe is answered locally; every other tool reaches a registry or service.
+    for name, ann in tools.items():
+        assert ann.openWorldHint is (name != "ga4gh_harness_describe"), name
+    # Exactly the two WES mutations carry side effects.
+    mutating = {name for name, ann in tools.items() if not ann.readOnlyHint}
+    assert mutating == {"ga4gh_wes_run_submit", "ga4gh_wes_run_cancel"}
+    for name in mutating:
+        assert tools[name].destructiveHint is True
+    assert tools["ga4gh_wes_run_submit"].idempotentHint is False
+    assert tools["ga4gh_wes_run_cancel"].idempotentHint is True

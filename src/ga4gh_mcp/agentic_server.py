@@ -159,7 +159,7 @@ def build_agentic_server(
         return await invoke(Operation.HARNESS_DESCRIBE, {})
 
     @mcp.tool(
-        annotations=_annotations(read_only=True, idempotent=True),
+        annotations=_annotations(read_only=True, idempotent=True, open_world=True),
         description=_description(
             Operation.SERVICE_SEARCH, "Search declarations of GA4GH services."
         ),
@@ -186,7 +186,7 @@ def build_agentic_server(
         )
 
     @mcp.tool(
-        annotations=_annotations(read_only=True, idempotent=True),
+        annotations=_annotations(read_only=True, idempotent=True, open_world=True),
         description=_description(
             Operation.SERVICE_DESCRIBE,
             "Describe a registered service and its Harness capabilities.",
@@ -277,7 +277,7 @@ def build_agentic_server(
         )
 
     @mcp.tool(
-        annotations=_annotations(read_only=True, idempotent=True),
+        annotations=_annotations(read_only=True, idempotent=True, open_world=True),
         description=_description(
             Operation.WES_SERVICE_DESCRIBE, "Describe WES execution capabilities."
         ),
@@ -329,7 +329,7 @@ def build_agentic_server(
         )
 
     @mcp.tool(
-        annotations=_annotations(read_only=False, open_world=True),
+        annotations=_annotations(read_only=False, idempotent=True, open_world=True),
         description=_description(Operation.WES_RUN_CANCEL, "Request cancellation of a WES run."),
         structured_output=True,
     )
