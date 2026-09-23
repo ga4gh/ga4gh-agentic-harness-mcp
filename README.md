@@ -43,29 +43,32 @@ uvx --from git+https://github.com/ga4gh/ga4gh-agentic-harness-mcp ga4gh-mcp --li
 # stdio (default) — for Claude Desktop / Claude Code
 ga4gh-mcp                      # or: python -m ga4gh_mcp
 
-# GA4GH Agentic Harness tools backed by the local Python SDK (default surface)
-ga4gh-mcp
-
-# registry, DRS, Data Connect, TRS, TES and Beacon tools (21 tools)
-ga4gh-mcp --surface legacy
-
 # local streamable HTTP
 ga4gh-mcp --transport streamable-http \
   --host 127.0.0.1 --port 8000 --path /mcp
 ```
 
 All options are also env vars (prefix `GA4GH_MCP_`):
-`GA4GH_MCP_SURFACE`, `GA4GH_MCP_TRANSPORT`, `GA4GH_MCP_HOST`,
+`GA4GH_MCP_TRANSPORT`, `GA4GH_MCP_HOST`,
 `GA4GH_MCP_PORT`, `GA4GH_MCP_HTTP_PATH`, `GA4GH_MCP_REGISTRY_BASE_URL`, timeouts, cache TTLs,
 `GA4GH_MCP_AUTH_CONFIG`, `GA4GH_MCP_BEARER_TOKEN`, `GA4GH_MCP_BEARER_HOSTS`. See `.env.example`.
 
-## Harness tools
+## Tools
 
-The server exposes the 13 canonical tools defined by the Agentic Harness MCP
-crosswalk. These tools delegate to the protocol-neutral SDK and return
-structured Harness envelopes. See [`docs/agentic-harness.md`](docs/agentic-harness.md).
+One server exposes 34 tools (`ga4gh-mcp --list-tools`):
 
-Every tool returns the Harness result envelope.
+- **13 Agentic Harness tools** (`ga4gh_*`), the canonical operations of the Agentic Harness MCP
+  crosswalk: service search, describe and probe; TRS workflow resolution; DRS object and
+  access resolution; Beacon variant query (v1 and v2); WES describe, submit, get and cancel;
+  conformance assessment. They delegate to the protocol-neutral SDK and return the Harness
+  result envelope. See [`docs/agentic-harness.md`](docs/agentic-harness.md).
+- **21 registry and service tools**: Implementation Registry browsing (services, standards,
+  organisations, service types, health, service-info), DRS, TRS tool listing, TES tasks,
+  Beacon info, Data Connect tables and SQL search, a generic `call_service_endpoint`, and auth
+  status / device login. They return `{"ok", "data" | "error", "warnings"}`.
+
+Where both sets cover the same standard (DRS, TRS, service discovery), prefer the Harness tool.
+Data Connect, TES and TRS listing exist only in the second set today.
 
 ## Verify from the CLI (no UI needed)
 

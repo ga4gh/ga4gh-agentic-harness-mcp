@@ -13,7 +13,7 @@ import respx
 from ga4gh_mcp import tools
 from ga4gh_mcp.config import load_settings
 from ga4gh_mcp.context import ServerContext
-from ga4gh_mcp.server import build_server
+from ga4gh_mcp.server import REGISTRY_TOOL_NAMES, build_server
 
 READ_ONLY_EXCEPT = {"auth_device_login"}
 
@@ -22,7 +22,8 @@ async def _tools(**kw):
     settings = load_settings(**kw)
     ctx = ServerContext.create(settings)
     mcp = build_server(settings, ctx=ctx)
-    listed = {t.name: t for t in await mcp.list_tools()}
+    # The Harness tools on the same server are covered in test_agentic_server.py.
+    listed = {t.name: t for t in await mcp.list_tools() if t.name in REGISTRY_TOOL_NAMES}
     await ctx.aclose()
     return listed
 
