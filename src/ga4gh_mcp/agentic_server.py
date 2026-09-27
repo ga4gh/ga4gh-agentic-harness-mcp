@@ -277,7 +277,10 @@ def register_harness_tools(
         annotations=_annotations(read_only=True, open_world=True),
         description=_description(
             Operation.BEACON_VARIANT_QUERY,
-            "Query a Beacon for variant evidence; results are not a clinical conclusion.",
+            "Query a Beacon (pre-1.0, v1 or v2) for variant evidence; results are not a clinical "
+            "conclusion. Send v1/v2 field names (referenceName, start, referenceBases, "
+            "alternateBases, assemblyId) with 0-based start, flat or as a v2 request entity; "
+            "the Harness converts to what the service's registry record declares.",
         ),
         structured_output=True,
     )

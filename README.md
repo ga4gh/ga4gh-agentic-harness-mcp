@@ -82,7 +82,7 @@ One server exposes 34 tools (`ga4gh-mcp --list-tools`):
 
 - **13 Agentic Harness tools** (`ga4gh_*`), the canonical operations of the Agentic Harness MCP
   crosswalk: service search, describe and probe; TRS workflow resolution; DRS object and
-  access resolution; Beacon variant query (v1 and v2); WES describe, submit, get and cancel;
+  access resolution; Beacon variant query (pre-1.0, v1 and v2); WES describe, submit, get and cancel;
   conformance assessment. They delegate to the protocol-neutral SDK and return the Harness
   result envelope. See [`docs/agentic-harness.md`](docs/agentic-harness.md).
 - **21 registry and service tools**: Implementation Registry browsing (services, standards,

@@ -244,7 +244,7 @@ def register_registry_tools(mcp: FastMCP, settings: Settings, context: ServerCon
 
     @mcp.tool(annotations=_READ)
     async def beacon_info(service_id: str) -> dict[str, Any]:
-        """Beacon: fetch the Beacon v2 framework info document."""
+        """Beacon (pre-1.0, v1, v2): fetch the info document where the declared version keeps it."""
         return await tools.beacon_info(context, service_id=service_id)
 
     @mcp.tool(annotations=_READ)

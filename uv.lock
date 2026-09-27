@@ -263,7 +263,7 @@ wheels = [
 [[package]]
 name = "ga4gh-agentic-harness"
 version = "0.1.0.dev0"
-source = { git = "https://github.com/ga4gh/ga4gh-agentic-harness-python?branch=main#bd2f30d1037dd29761aa6eff202e643d758f8097" }
+source = { git = "https://github.com/ga4gh/ga4gh-agentic-harness-python?branch=main#1de641ca248d4535e4f6d275f856af0a7b6898a3" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
