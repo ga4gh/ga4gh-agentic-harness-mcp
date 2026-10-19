@@ -11,7 +11,7 @@ keywords = ["ga4gh", "mcp", "genomics", "drs", "trs", "tes", "beacon", "model-co
 # Pinned for reproducibility (verified working on Python 3.14, 2026-07-05).
 dependencies = [
     "ga4gh-agentic-harness==0.1.0.dev0",
-    "mcp==1.28.1",
+    "mcp==1.30.0",
     "httpx==0.28.1",
     "pydantic==2.13.4",
     "pydantic-settings==2.14.2",
